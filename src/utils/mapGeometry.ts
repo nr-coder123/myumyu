@@ -215,10 +215,23 @@ export function getAllianceProvincePaths(
 }
 
 /**
+ * Calculate absolute polygon ring area in coordinate square units.
+ */
+function getRingArea(ring: number[][]): number {
+  if (!ring || ring.length < 4) return 0;
+  let sum = 0;
+  for (let i = 0; i < ring.length - 1; i++) {
+    sum += (ring[i + 1][0] - ring[i][0]) * (ring[i + 1][1] + ring[i][1]);
+  }
+  return Math.abs(sum) / 2;
+}
+
+/**
  * Calculate signed polygon ring area.
  * Returns > 0 for clockwise winding, < 0 for counter-clockwise.
  */
 function getRingSignedArea(ring: number[][]): number {
+  if (!ring || ring.length < 4) return 0;
   let sum = 0;
   for (let i = 0; i < ring.length - 1; i++) {
     sum += (ring[i + 1][0] - ring[i][0]) * (ring[i + 1][1] + ring[i][1]);
@@ -227,27 +240,54 @@ function getRingSignedArea(ring: number[][]): number {
 }
 
 /**
- * Fix spherical polygon winding order for d3-geo:
- * In d3-geo (spherical Mercator), exterior rings MUST be clockwise (positive signed area)
- * and interior hole rings MUST be counter-clockwise (negative signed area).
- * polygon-clipping outputs Cartesian standard rings (exterior = CCW, hole = CW),
- * which otherwise causes d3-geo to treat the exterior ring as the entire globe (inverted world bounding box).
+ * Clean slivers and fix spherical polygon winding order for d3-geo:
+ * 1. Removes micro-island slivers (< 0.002 deg²) created by crossing border boundaries.
+ * 2. Removes micro-holes (< 0.015 deg²) created by coordinate digitization mismatches along borders,
+ *    preventing dotted/beaded stroke artifacts along shared boundaries.
+ * 3. Enforces spherical Mercator clockwise winding for outer boundaries and counter-clockwise for genuine enclaves.
  */
-function fixMultiPolygonWindingForD3(multiPoly: any[]): any[] {
-  return multiPoly.map(poly => {
-    return poly.map((ring: number[][], ringIdx: number) => {
-      const area = getRingSignedArea(ring);
-      // Ring 0 (exterior boundary) must be clockwise (area > 0)
-      if (ringIdx === 0 && area < 0) {
-        return [...ring].reverse();
-      }
-      // Ring > 0 (holes) must be counter-clockwise (area < 0)
-      if (ringIdx > 0 && area > 0) {
-        return [...ring].reverse();
-      }
-      return ring;
-    });
-  });
+function cleanAndFixMultiPolygon(
+  multiPoly: any[],
+  minHoleArea: number = 0.015,
+  minPolyArea: number = 0.002
+): any[] {
+  const cleanedPolys: any[] = [];
+
+  for (const poly of multiPoly) {
+    if (!poly || poly.length === 0) continue;
+    const outerRing = poly[0];
+    if (!outerRing || outerRing.length < 4) continue;
+
+    const outerArea = getRingArea(outerRing);
+    // Discard tiny sliver micro-islands
+    if (outerArea < minPolyArea) continue;
+
+    const cleanedRings: number[][][] = [];
+
+    // Outer boundary must be clockwise in d3-geo
+    const outerSigned = getRingSignedArea(outerRing);
+    cleanedRings.push(outerSigned < 0 ? [...outerRing].reverse() : outerRing);
+
+    // Process holes / enclaves
+    for (let r = 1; r < poly.length; r++) {
+      const holeRing = poly[r];
+      if (!holeRing || holeRing.length < 4) continue;
+
+      const holeArea = getRingArea(holeRing);
+      // Discard micro-gaps from mismatched GIS vertices along shared borders
+      if (holeArea < minHoleArea) continue;
+
+      // Legitimate interior enclave (must be counter-clockwise in d3-geo)
+      const holeSigned = getRingSignedArea(holeRing);
+      cleanedRings.push(holeSigned > 0 ? [...holeRing].reverse() : holeRing);
+    }
+
+    if (cleanedRings.length > 0) {
+      cleanedPolys.push(cleanedRings);
+    }
+  }
+
+  return cleanedPolys;
 }
 
 /**
@@ -292,7 +332,11 @@ export function getMergedAlliancePath(memberProvinces: ProcessedProvince[]): str
       return memberProvinces.map(p => p.pathD).join(' ');
     }
 
-    const correctedCoordinates = fixMultiPolygonWindingForD3(unionResult);
+    const correctedCoordinates = cleanAndFixMultiPolygon(unionResult);
+
+    if (!correctedCoordinates || correctedCoordinates.length === 0) {
+      return memberProvinces.map(p => p.pathD).join(' ');
+    }
 
     const mergedFeature: any = {
       type: 'Feature',
