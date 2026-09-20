@@ -342,7 +342,9 @@ export const MurimMapCanvas: React.FC<MurimMapCanvasProps> = ({ svgRef: external
     for (const alliance of alliances) {
       const memberProvs = processedProvinces.filter(p => {
         const state = provinceStates[p.key];
-        return state?.allianceId === alliance.id || alliance.memberProvinces.includes(p.key);
+        const isDirect = state?.allianceId === alliance.id || alliance.memberProvinces.includes(p.key);
+        const isParentInAlliance = !!(p.parentKey && (provinceStates[p.parentKey]?.allianceId === alliance.id || alliance.memberProvinces.includes(p.parentKey)));
+        return isDirect || isParentInAlliance;
       });
       if (memberProvs.length > 0) {
         map[alliance.id] = getMergedAlliancePath(memberProvs);

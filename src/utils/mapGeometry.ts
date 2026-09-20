@@ -209,7 +209,44 @@ export function getAllianceProvincePaths(
   return provinces.filter(p => {
     const state = provinceStates[p.key];
     const isInAlliance = state?.allianceId === alliance.id || alliance.memberProvinces.includes(p.key);
-    return isInAlliance;
+    const isParentInAlliance = !!(p.parentKey && (provinceStates[p.parentKey]?.allianceId === alliance.id || alliance.memberProvinces.includes(p.parentKey)));
+    return isInAlliance || isParentInAlliance;
+  });
+}
+
+/**
+ * Calculate signed polygon ring area.
+ * Returns > 0 for clockwise winding, < 0 for counter-clockwise.
+ */
+function getRingSignedArea(ring: number[][]): number {
+  let sum = 0;
+  for (let i = 0; i < ring.length - 1; i++) {
+    sum += (ring[i + 1][0] - ring[i][0]) * (ring[i + 1][1] + ring[i][1]);
+  }
+  return sum;
+}
+
+/**
+ * Fix spherical polygon winding order for d3-geo:
+ * In d3-geo (spherical Mercator), exterior rings MUST be clockwise (positive signed area)
+ * and interior hole rings MUST be counter-clockwise (negative signed area).
+ * polygon-clipping outputs Cartesian standard rings (exterior = CCW, hole = CW),
+ * which otherwise causes d3-geo to treat the exterior ring as the entire globe (inverted world bounding box).
+ */
+function fixMultiPolygonWindingForD3(multiPoly: any[]): any[] {
+  return multiPoly.map(poly => {
+    return poly.map((ring: number[][], ringIdx: number) => {
+      const area = getRingSignedArea(ring);
+      // Ring 0 (exterior boundary) must be clockwise (area > 0)
+      if (ringIdx === 0 && area < 0) {
+        return [...ring].reverse();
+      }
+      // Ring > 0 (holes) must be counter-clockwise (area < 0)
+      if (ringIdx > 0 && area > 0) {
+        return [...ring].reverse();
+      }
+      return ring;
+    });
   });
 }
 
@@ -255,12 +292,14 @@ export function getMergedAlliancePath(memberProvinces: ProcessedProvince[]): str
       return memberProvinces.map(p => p.pathD).join(' ');
     }
 
+    const correctedCoordinates = fixMultiPolygonWindingForD3(unionResult);
+
     const mergedFeature: any = {
       type: 'Feature',
       properties: {},
       geometry: {
         type: 'MultiPolygon',
-        coordinates: unionResult
+        coordinates: correctedCoordinates
       }
     };
 
