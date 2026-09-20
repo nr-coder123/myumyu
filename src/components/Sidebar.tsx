@@ -65,6 +65,8 @@ export const Sidebar: React.FC = () => {
     setActiveTool,
     setBrushTarget,
     setAllianceBorderOverProvince,
+    frontierLines,
+    deleteFrontierLine,
     setProvinceBorderOverride,
     clearAllOwnership,
     resetToCleanSlate,
@@ -558,6 +560,54 @@ export const Sidebar: React.FC = () => {
                       </div>
                     );
                   })
+              )}
+            </div>
+
+            {/* Custom Drawn Frontier Lines */}
+            <div className="pt-3 border-t border-stone-800 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-stone-400">Drawn Frontier / Wall Lines:</span>
+                <span className="text-[10px] text-stone-500 font-mono">
+                  {(frontierLines || []).length} active
+                </span>
+              </div>
+              {(frontierLines || []).length === 0 ? (
+                <p className="text-xs text-stone-500 italic p-2 bg-stone-900/40 rounded border border-stone-800/80">
+                  No drawn frontier lines. Use the Frontier Line tool in the toolbar to draw custom barrier lines or Great Wall segments.
+                </p>
+              ) : (
+                <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                  {frontierLines.map((line, idx) => (
+                    <div
+                      key={line.id}
+                      className="p-2 bg-stone-900/80 rounded-lg border border-stone-800 flex items-center justify-between"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <div
+                          className="w-3.5 h-3.5 rounded border border-stone-600"
+                          style={{ backgroundColor: line.color }}
+                        />
+                        <div>
+                          <span className="font-bold text-xs text-stone-200">
+                            Line #{idx + 1} {line.style === 'dashed' ? '(Dashed)' : '(Solid)'}
+                          </span>
+                          <div className="text-[10px] text-stone-400 font-mono">
+                            {line.width}px · {line.points.length} nodes
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => deleteFrontierLine(line.id)}
+                        className="p-1 text-stone-400 hover:text-rose-400"
+                        title="Delete stray frontier line"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           </div>

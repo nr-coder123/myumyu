@@ -792,12 +792,18 @@ export const MurimProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setFactions([]);
     setAlliances([]);
     setProvinces({});
+    setSubdividedRegionsState([]);
     setFrontierLines([]);
-    setLandmarks([]);
+    setLandmarks(defaultLandmarks);
     setCustomPins([]);
     setSelectedFactionId(null);
     setSelectedAllianceId(null);
     setSelectedProvinceKey(null);
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch (e) {
+      console.warn('Could not clear localStorage:', e);
+    }
   }, [pushSnapshot]);
 
   // Optional template loader (only used if user clicks "Import Example Template")
