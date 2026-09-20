@@ -21,6 +21,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({ svgRef }) => {
     closeExportModal,
     mapTitle,
     era,
+    mapMode,
     exportProjectJson
   } = useMurim();
 
@@ -37,16 +38,62 @@ export const ExportModal: React.FC<ExportModalProps> = ({ svgRef }) => {
     setExportSuccess(false);
 
     try {
-      const svgElement = svgRef?.current || document.querySelector('svg');
+      const svgElement = svgRef?.current || 
+        document.getElementById('murim-map-main-svg') || 
+        document.querySelector('svg[data-map-canvas="true"]') || 
+        document.querySelector('svg');
+
       if (!svgElement) {
         throw new Error('SVG map element not found');
       }
 
       // Clone SVG element to prepare clean standalone XML
       const clonedSvg = svgElement.cloneNode(true) as SVGSVGElement;
+      clonedSvg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+      clonedSvg.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
       clonedSvg.setAttribute('width', `${MAP_WIDTH}`);
       clonedSvg.setAttribute('height', `${MAP_HEIGHT}`);
+      clonedSvg.setAttribute('viewBox', `0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`);
       clonedSvg.removeAttribute('style');
+
+      // Reset zoom and pan transform so the full uncropped map is rendered in export
+      const worldGroup = clonedSvg.querySelector('#murim-map-world-group');
+      if (worldGroup) {
+        worldGroup.setAttribute('transform', 'translate(0, 0) scale(1)');
+      }
+
+      // Embed background rectangle
+      const bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      bgRect.setAttribute('x', '0');
+      bgRect.setAttribute('y', '0');
+      bgRect.setAttribute('width', `${MAP_WIDTH}`);
+      bgRect.setAttribute('height', `${MAP_HEIGHT}`);
+      bgRect.setAttribute('fill', mapMode === 'parchment' ? '#e8dfc8' : '#141820');
+      clonedSvg.insertBefore(bgRect, clonedSvg.firstChild);
+
+      // Embed document CSS styles inside standalone SVG for font & class fidelity
+      let embeddedStyles = '';
+      try {
+        for (const sheet of Array.from(document.styleSheets)) {
+          try {
+            if (sheet.cssRules) {
+              for (const rule of Array.from(sheet.cssRules)) {
+                embeddedStyles += rule.cssText + '\n';
+              }
+            }
+          } catch {
+            // Safe cross-origin stylesheet catch
+          }
+        }
+      } catch {
+        // ignore
+      }
+
+      if (embeddedStyles) {
+        const styleEl = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+        styleEl.textContent = embeddedStyles;
+        clonedSvg.insertBefore(styleEl, clonedSvg.firstChild);
+      }
 
       // If banner option is checked, add title bar into SVG export
       if (includeBanner) {
@@ -93,46 +140,66 @@ export const ExportModal: React.FC<ExportModalProps> = ({ svgRef }) => {
       const blobURL = URL_API.createObjectURL(svgBlob);
 
       const image = new window.Image();
-      image.crossOrigin = 'anonymous';
+      // DO NOT set crossOrigin = 'anonymous' on blob: URLs as it blocks Image loading in Chromium
 
-      image.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = MAP_WIDTH * scale;
-        canvas.height = MAP_HEIGHT * scale;
-        const ctx = canvas.getContext('2d');
-
-        if (!ctx) {
-          URL_API.revokeObjectURL(blobURL);
-          setIsExporting(false);
-          return;
-        }
-
-        // Draw background
-        ctx.fillStyle = '#141820';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        // Render scaled SVG
-        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+      let timerId: NodeJS.Timeout | null = null;
+      const cleanup = () => {
+        if (timerId) clearTimeout(timerId);
         URL_API.revokeObjectURL(blobURL);
-
-        // Convert to data URL and download
-        const mime = format === 'jpeg' ? 'image/jpeg' : 'image/png';
-        const dataUrl = canvas.toDataURL(mime, 0.95);
-
-        const downloadLink = document.createElement('a');
-        const filename = `${mapTitle.replace(/[^a-zA-Z0-9_\u4e00-\u9fa5]/g, '_')}_${scale}x.${format}`;
-        downloadLink.download = filename;
-        downloadLink.href = dataUrl;
-        document.body.appendChild(downloadLink);
-        downloadLink.click();
-        document.body.removeChild(downloadLink);
-
-        setIsExporting(false);
-        setExportSuccess(true);
       };
 
-      image.onerror = () => {
-        URL_API.revokeObjectURL(blobURL);
+      timerId = setTimeout(() => {
+        cleanup();
+        setIsExporting(false);
+        alert('Image rendering timed out. You can export as SVG Vector directly.');
+      }, 7000);
+
+      image.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = MAP_WIDTH * scale;
+          canvas.height = MAP_HEIGHT * scale;
+          const ctx = canvas.getContext('2d');
+
+          if (!ctx) {
+            cleanup();
+            setIsExporting(false);
+            return;
+          }
+
+          // Draw background
+          ctx.fillStyle = mapMode === 'parchment' ? '#e8dfc8' : '#141820';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+          // Render scaled SVG
+          ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+          // Convert to data URL and download
+          const mime = format === 'jpeg' ? 'image/jpeg' : 'image/png';
+          const dataUrl = canvas.toDataURL(mime, format === 'jpeg' ? 0.92 : 1.0);
+
+          const downloadLink = document.createElement('a');
+          const filename = `${mapTitle.replace(/[^a-zA-Z0-9_\u4e00-\u9fa5]/g, '_')}_${scale}x.${format}`;
+          downloadLink.download = filename;
+          downloadLink.href = dataUrl;
+          document.body.appendChild(downloadLink);
+          downloadLink.click();
+          document.body.removeChild(downloadLink);
+
+          cleanup();
+          setIsExporting(false);
+          setExportSuccess(true);
+        } catch (err) {
+          console.error('Canvas export error:', err);
+          cleanup();
+          setIsExporting(false);
+          alert('Failed to draw map on canvas.');
+        }
+      };
+
+      image.onerror = (err) => {
+        console.error('Export image loading error:', err);
+        cleanup();
         setIsExporting(false);
         alert('Failed to render map image.');
       };

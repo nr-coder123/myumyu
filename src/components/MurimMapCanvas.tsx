@@ -412,6 +412,8 @@ export const MurimMapCanvas: React.FC<MurimMapCanvasProps> = ({ svgRef: external
 
       {/* Main Map SVG */}
       <svg
+        id="murim-map-main-svg"
+        data-map-canvas="true"
         ref={activeSvgRef}
         viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`}
         className="w-full h-full transition-transform duration-75 ease-out"
@@ -425,6 +427,7 @@ export const MurimMapCanvas: React.FC<MurimMapCanvasProps> = ({ svgRef: external
 
         {/* Scaled & Translated World Container */}
         <g 
+          id="murim-map-world-group"
           transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}
           style={{ transformOrigin: 'center center' }}
         >
