@@ -1,5 +1,8 @@
 import chinaGeoJsonRaw from 'china-map-geojson/lib/china.js';
 import { ProvinceData } from 'china-map-geojson';
+import { romanizeChinese, SPECIAL_ROMANIZATION } from './subprovinceMetadata';
+
+export { romanizeChinese, SPECIAL_ROMANIZATION };
 
 export interface ProvinceMeta {
   id: string;
@@ -391,7 +394,10 @@ export const PROVINCE_TO_GEOJSON_KEY: Record<string, string> = {
   '上海': 'Shanghai',
   '重庆': 'Chongqing',
   '海南': 'Hainan',
-  '广西': 'Guangxi'
+  '广西': 'Guangxi',
+  '台湾': 'Taiwan',
+  '香港': 'Xianggang',
+  '澳门': 'Aomen'
 };
 
 export const SUBPROVINCE_METADATA: Record<string, Partial<ProvinceMeta>> = {
@@ -823,44 +829,51 @@ export const SUBPROVINCE_METADATA: Record<string, Partial<ProvinceMeta>> = {
 };
 
 export function getSubprovinceMeta(cleanKey: string, parentKey = ''): ProvinceMeta {
-  const custom = SUBPROVINCE_METADATA[cleanKey];
+  // Normalize any trailing suffixes if passed
+  const normalizedKey = cleanKey
+    .replace(/(市|地区|藏族自治州|彝族自治州|自治州|哈萨克自治州|回族自治州|蒙古自治州|朝鲜族自治州|布依族苗族自治州|苗族侗族自治州|哈尼族彝族自治州|傣族自治州|白族自治州|藏族羌族自治州|土家族苗族自治州|壮族苗族自治州|林区|特别行政区|自治县|县|区)$/, '') || cleanKey;
+
+  const custom = SUBPROVINCE_METADATA[normalizedKey] || SUBPROVINCE_METADATA[cleanKey];
   const parentMeta = PROVINCE_METADATA[parentKey] || {
-    id: 'unknown',
-    name: parentKey,
-    hanzi: parentKey,
-    historicalName: parentKey,
+    id: parentKey ? romanizeChinese(parentKey).toLowerCase() : 'unknown',
+    name: parentKey ? romanizeChinese(parentKey) : 'Central Plains',
+    hanzi: parentKey || '中原',
+    historicalName: parentKey ? `${romanizeChinese(parentKey)} Domain` : 'Great Realm',
     region: 'Central Plains' as const,
-    capital: '',
+    capital: parentKey ? romanizeChinese(parentKey) : 'Capital',
     landmarks: [],
-    description: 'Subprovince of the Great Realm'
+    description: 'Province of the Great Realm'
   };
+
+  const romanizedName = custom?.name || romanizeChinese(normalizedKey);
+  const parentRomanized = parentMeta.name || (parentKey ? romanizeChinese(parentKey) : 'Central Realm');
 
   if (custom) {
     return {
-      id: `${parentKey}_${cleanKey}`,
-      name: custom.name || cleanKey,
-      hanzi: custom.hanzi || cleanKey,
-      historicalName: custom.historicalName || `${cleanKey} (${parentMeta.historicalName})`,
+      id: `${parentKey || 'region'}_${normalizedKey}`,
+      name: custom.name || romanizedName,
+      hanzi: custom.hanzi || normalizedKey,
+      historicalName: custom.historicalName || `${romanizedName} (${parentMeta.historicalName})`,
       region: (custom.region || parentMeta.region) as any,
-      capital: custom.capital || cleanKey,
-      parentProvince: custom.parentProvince || parentMeta.name,
+      capital: custom.capital || romanizedName,
+      parentProvince: custom.parentProvince || parentRomanized,
       parentHanzi: custom.parentHanzi || parentKey,
-      landmarks: custom.landmarks || [`${cleanKey} Commandery`, `${cleanKey} River Crossing`],
-      description: custom.description || `Subprovince in ${parentMeta.name}. Strategic commandery and martial crossroads.`
+      landmarks: custom.landmarks || [`${romanizedName} Commandery`, `${romanizedName} River Crossing`],
+      description: custom.description || `Subprovince in ${parentRomanized}. Strategic commandery and martial crossroads.`
     };
   }
 
   return {
-    id: `${parentKey}_${cleanKey}`,
-    name: cleanKey,
-    hanzi: cleanKey,
-    historicalName: `${cleanKey} Commandery`,
+    id: `${parentKey || 'region'}_${normalizedKey}`,
+    name: romanizedName,
+    hanzi: normalizedKey,
+    historicalName: `${romanizedName} Commandery`,
     region: parentMeta.region,
-    capital: cleanKey,
-    parentProvince: parentMeta.name,
+    capital: romanizedName,
+    parentProvince: parentRomanized,
     parentHanzi: parentKey,
-    landmarks: [`${cleanKey} Fortress`, `${cleanKey} Market`],
-    description: `Subprovince in ${parentMeta.name}. Governed by regional commanderies and local martial arts schools.`
+    landmarks: [`${romanizedName} Fortress`, `${romanizedName} Market Gate`, `${romanizedName} Garrison`],
+    description: `Prefecture of ${parentRomanized} (${normalizedKey}). Governed by regional commanderies and defended by local martial arts schools.`
   };
 }
 

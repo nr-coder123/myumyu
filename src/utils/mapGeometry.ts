@@ -53,7 +53,7 @@ export function getProcessedProvinces(subdividedRegions: string[] = ['河南', '
       if (subData && Array.isArray(subData.features) && subData.features.length > 0) {
         for (const subFeature of subData.features) {
           const subRawName = subFeature.properties?.name || '';
-          const subCleanName = subRawName.replace(/(市|地区|藏族自治州|彝族自治州|自治州|哈萨克自治州|回族自治州|蒙古自治州|朝鲜族自治州|布依族苗族自治州|苗族侗族自治州|哈尼族彝族自治州|傣族自治州|白族自治州|藏族羌族自治州|土家族苗族自治州|壮族苗族自治州|林区)$/, '');
+          const subCleanName = subRawName.replace(/(市|地区|藏族自治州|彝族自治州|自治州|哈萨克自治州|回族自治州|蒙古自治州|朝鲜族自治州|布依族苗族自治州|苗族侗族自治州|哈尼族彝族自治州|傣族自治州|白族自治州|藏族羌族自治州|土家族苗族自治州|壮族苗族自治州|林区|特别行政区|自治县|县|区)$/, '') || subRawName;
           
           const pathD = geoPathGenerator(subFeature) || '';
           if (!pathD) continue;

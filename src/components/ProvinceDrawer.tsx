@@ -34,7 +34,7 @@ export const ProvinceDrawer: React.FC = () => {
 
   if (!isProvinceDrawerOpen || !selectedProvinceKey) return null;
 
-  const meta = getSubprovinceMeta(selectedProvinceKey) || PROVINCE_METADATA[selectedProvinceKey] || {
+  const meta = PROVINCE_METADATA[selectedProvinceKey] || getSubprovinceMeta(selectedProvinceKey) || {
     id: selectedProvinceKey,
     name: selectedProvinceKey,
     hanzi: selectedProvinceKey,
@@ -75,10 +75,10 @@ export const ProvinceDrawer: React.FC = () => {
         <div>
           <div className="flex items-center space-x-2">
             <span className="font-serif font-black text-2xl text-amber-300">
-              {selectedProvinceKey}
-            </span>
-            <span className="text-stone-300 font-semibold text-lg">
               {meta.name}
+            </span>
+            <span className="text-stone-400 font-serif text-base">
+              ({meta.hanzi || selectedProvinceKey})
             </span>
           </div>
           <p className="text-xs text-amber-500/90 font-serif italic">

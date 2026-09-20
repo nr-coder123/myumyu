@@ -26,7 +26,7 @@ import {
   PROVINCE_METADATA, 
   PROVINCE_TO_GEOJSON_KEY, 
   CHINA_PROVINCE_DATA, 
-  SUBPROVINCE_METADATA 
+  getSubprovinceMeta
 } from '../data/chinaProvinces';
 import { projectCoordinates, MAP_WIDTH, MAP_HEIGHT } from '../utils/mapGeometry';
 
@@ -1184,9 +1184,10 @@ export const Sidebar: React.FC = () => {
                           </div>
                           <div className="grid grid-cols-1 gap-1 max-h-48 overflow-y-auto pr-1">
                             {geo?.features?.map((f: any, idx: number) => {
-                              const subName = f.properties?.name || `Area ${idx + 1}`;
-                              const subMeta = SUBPROVINCE_METADATA[subName];
-                              const subState = provinces[subName] || {};
+                              const subRawName = f.properties?.name || `Area ${idx + 1}`;
+                              const subCleanName = subRawName.replace(/(市|地区|藏族自治州|彝族自治州|自治州|哈萨克自治州|回族自治州|蒙古自治州|朝鲜族自治州|布依族苗族自治州|苗族侗族自治州|哈尼族彝族自治州|傣族自治州|白族自治州|藏族羌族自治州|土家族苗族自治州|壮族苗族自治州|林区|特别行政区|自治县|县|区)$/, '') || subRawName;
+                              const subMeta = getSubprovinceMeta(subCleanName, pKey);
+                              const subState = provinces[subCleanName] || provinces[subRawName] || {};
                               const subFaction = factions.find(fc => fc.id === subState.factionId);
 
                               return (
@@ -1195,14 +1196,12 @@ export const Sidebar: React.FC = () => {
                                   className="px-2 py-1 bg-stone-950/70 rounded border border-stone-800/80 flex items-center justify-between text-xs hover:border-amber-700/50"
                                 >
                                   <div className="flex items-center space-x-1.5 truncate mr-2">
-                                    <span className="font-serif text-stone-300">
-                                      {subName}
+                                    <span className="font-semibold text-stone-200">
+                                      {subMeta.name}
                                     </span>
-                                    {subMeta && (
-                                      <span className="text-[10px] text-stone-500 truncate">
-                                        ({subMeta.name})
-                                      </span>
-                                    )}
+                                    <span className="text-[11px] text-stone-400 font-serif">
+                                      ({subCleanName})
+                                    </span>
                                   </div>
 
                                   <div className="flex items-center space-x-1 shrink-0">
@@ -1230,9 +1229,9 @@ export const Sidebar: React.FC = () => {
                                     {selectedFactionId && isSubdivided && (
                                       <button
                                         type="button"
-                                        onClick={() => paintProvince(subName, selectedFactionId)}
+                                        onClick={() => paintProvince(subCleanName, selectedFactionId)}
                                         className="p-1 text-stone-400 hover:text-amber-300 hover:bg-stone-800 rounded"
-                                        title={`Assign to active sect`}
+                                        title={`Assign ${subMeta.name} to active sect`}
                                       >
                                         <Paintbrush className="w-3 h-3" />
                                       </button>
@@ -1240,9 +1239,9 @@ export const Sidebar: React.FC = () => {
 
                                     <button
                                       type="button"
-                                      onClick={() => openProvinceDrawer(subName)}
+                                      onClick={() => openProvinceDrawer(subCleanName)}
                                       className="p-1 text-stone-400 hover:text-stone-200 hover:bg-stone-800 rounded"
-                                      title="Inspect & edit prefecture"
+                                      title={`Inspect & edit ${subMeta.name}`}
                                     >
                                       <Edit3 className="w-3 h-3" />
                                     </button>
