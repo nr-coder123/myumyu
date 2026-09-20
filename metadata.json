@@ -1,0 +1,8 @@
+{
+  "name": "Murim World Map Studio",
+  "description": "Grand Strategy Realm & Alliance Borders map editor and tactical territory planner for Murim martial worlds",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <script>
+      // Defensive fetch wrapper to prevent "Cannot set property fetch of #<Window> which has only a getter"
+      // while guaranteeing that native fetch is always invoked with the Window context.
+      (function() {
+        try {
+          if (typeof window !== 'undefined' && window.fetch) {
+            var nativeFetch = window.fetch.bind(window);
+            var activeFetch = nativeFetch;
+            var safeFetchProxy = function() {
+              return (activeFetch || nativeFetch).apply(window, arguments);
+            };
+            Object.defineProperty(window, 'fetch', {
+              get: function() { return safeFetchProxy; },
+              set: function(fn) {
+                if (typeof fn === 'function') {
+                  activeFetch = fn;
+                }
+              },
+              configurable: true,
+              enumerable: true
+            });
+          }
+        } catch (e) {
+          // Fallback gracefully
+        }
+      })();
+    </script>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23991b1b'/><text x='50' y='68' font-size='55' text-anchor='middle' fill='%23fef08a' font-family='serif' font-weight='bold'>武</text></svg>" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Grand Strategy Realm & Alliance Borders map editor and tactical territory planner for Murim martial worlds" />
+    <meta property="og:title" content="Murim World Map Studio · Grand Strategy Realm & Alliance Borders" />
+    <meta property="og:description" content="Grand Strategy Realm & Alliance Borders map editor and tactical territory planner for Murim martial worlds" />
+    <title>Murim World Map Studio · Grand Strategy Realm & Alliance Borders</title>
+    <!-- Google Fonts for antique calligraphy feel -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Noto+Serif+SC:wght@400;600;700;900&display=swap" rel="stylesheet">
+  </head>
+  <body class="bg-stone-950 text-stone-100 overflow-hidden font-sans antialiased">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
