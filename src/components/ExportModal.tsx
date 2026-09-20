@@ -71,14 +71,18 @@ export const ExportModal: React.FC<ExportModalProps> = ({ svgRef }) => {
       bgRect.setAttribute('fill', mapMode === 'parchment' ? '#e8dfc8' : '#141820');
       clonedSvg.insertBefore(bgRect, clonedSvg.firstChild);
 
-      // Embed document CSS styles inside standalone SVG for font & class fidelity
+      // Embed safe document CSS styles inside standalone SVG for font & class fidelity
+      // Filter out any @import, @font-face, or url() references to prevent canvas security tainting
       let embeddedStyles = '';
       try {
         for (const sheet of Array.from(document.styleSheets)) {
           try {
             if (sheet.cssRules) {
               for (const rule of Array.from(sheet.cssRules)) {
-                embeddedStyles += rule.cssText + '\n';
+                const text = rule.cssText;
+                if (!text.includes('url(') && !text.includes('@import') && !text.includes('@font-face')) {
+                  embeddedStyles += text + '\n';
+                }
               }
             }
           } catch {
@@ -135,23 +139,20 @@ export const ExportModal: React.FC<ExportModalProps> = ({ svgRef }) => {
       }
 
       const svgData = new XMLSerializer().serializeToString(clonedSvg);
-      const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
-      const URL_API = window.URL || window.webkitURL || window;
-      const blobURL = URL_API.createObjectURL(svgBlob);
+      const base64Svg = 'data:image/svg+xml;base64,' + window.btoa(unescape(encodeURIComponent(svgData)));
 
       const image = new window.Image();
-      // DO NOT set crossOrigin = 'anonymous' on blob: URLs as it blocks Image loading in Chromium
 
       let timerId: NodeJS.Timeout | null = null;
       const cleanup = () => {
         if (timerId) clearTimeout(timerId);
-        URL_API.revokeObjectURL(blobURL);
       };
 
       timerId = setTimeout(() => {
         cleanup();
         setIsExporting(false);
-        alert('Image rendering timed out. You can export as SVG Vector directly.');
+        alert('Image rendering timed out. Exporting as SVG Vector instead.');
+        handleDownloadSvg();
       }, 7000);
 
       image.onload = () => {
@@ -190,21 +191,22 @@ export const ExportModal: React.FC<ExportModalProps> = ({ svgRef }) => {
           setIsExporting(false);
           setExportSuccess(true);
         } catch (err) {
-          console.error('Canvas export error:', err);
+          console.warn('Canvas export error, falling back to SVG export:', err);
           cleanup();
           setIsExporting(false);
-          alert('Failed to draw map on canvas.');
+          // Fallback: trigger vector SVG download directly
+          handleDownloadSvg();
         }
       };
 
       image.onerror = (err) => {
-        console.error('Export image loading error:', err);
+        console.warn('Export image loading error, falling back to SVG:', err);
         cleanup();
         setIsExporting(false);
-        alert('Failed to render map image.');
+        handleDownloadSvg();
       };
 
-      image.src = blobURL;
+      image.src = base64Svg;
     } catch (err) {
       console.error('Export error:', err);
       setIsExporting(false);
