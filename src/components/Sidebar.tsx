@@ -19,6 +19,7 @@ import {
   Mountain,
   Crosshair,
   Sliders,
+  RotateCcw,
   LucideIcon
 } from 'lucide-react';
 import { useMurim } from '../context/MurimContext';
@@ -70,7 +71,8 @@ export const Sidebar: React.FC = () => {
     deleteFrontierLine,
     setProvinceBorderOverride,
     clearAllOwnership,
-    resetToCleanSlate,
+    resetToFactoryDefaults,
+    openResetModal,
     loadExampleTemplate,
     exportProjectJson,
     importProjectJson,
@@ -1539,9 +1541,17 @@ export const Sidebar: React.FC = () => {
             </div>
 
             {/* Clear / Reset */}
-            <div className="p-3 bg-stone-900/60 rounded-lg border border-stone-800 space-y-2">
-              <span className="font-bold text-rose-300 block">Clear & Reset Options</span>
-              <div className="flex space-x-2">
+            <div className="p-3 bg-stone-900/60 rounded-lg border border-stone-800 space-y-2.5">
+              <span className="font-bold text-rose-300 block text-xs">Clear & Reset Options</span>
+              <button
+                type="button"
+                onClick={openResetModal}
+                className="w-full py-2 bg-rose-950/80 hover:bg-rose-900 text-rose-200 rounded-lg border border-rose-700/80 text-xs font-semibold flex items-center justify-center space-x-1.5 shadow-sm transition-all"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-rose-400" />
+                <span>Open Reset & Restore Menu</span>
+              </button>
+              <div className="flex space-x-2 pt-1">
                 <button
                   type="button"
                   onClick={() => {
@@ -1549,20 +1559,20 @@ export const Sidebar: React.FC = () => {
                       clearAllOwnership();
                     }
                   }}
-                  className="flex-1 py-1.5 bg-stone-900 hover:bg-rose-950/60 text-stone-300 hover:text-rose-200 rounded-lg border border-stone-800 text-[11px]"
+                  className="flex-1 py-1.5 bg-stone-900 hover:bg-stone-800 text-stone-300 hover:text-amber-200 rounded-lg border border-stone-800 text-[11px]"
                 >
-                  Clear Painted Map
+                  Clear Map Claims
                 </button>
                 <button
                   type="button"
                   onClick={() => {
-                    if (confirm('Reset to completely empty clean slate? All custom sects and alliances will be deleted.')) {
-                      resetToCleanSlate();
+                    if (confirm('Completely purge browser save instance and restore factory defaults?')) {
+                      resetToFactoryDefaults();
                     }
                   }}
-                  className="flex-1 py-1.5 bg-rose-950/40 hover:bg-rose-950 text-rose-300 rounded-lg border border-rose-900/60 text-[11px]"
+                  className="flex-1 py-1.5 bg-rose-950/40 hover:bg-rose-950 text-rose-300 rounded-lg border border-rose-900/60 text-[11px] font-medium"
                 >
-                  Reset All to Empty
+                  Factory Reset
                 </button>
               </div>
             </div>

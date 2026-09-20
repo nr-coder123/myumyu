@@ -10,6 +10,7 @@ import { FactionModal } from './components/FactionModal';
 import { AllianceModal } from './components/AllianceModal';
 import { LandmarkModal } from './components/LandmarkModal';
 import { ExportModal } from './components/ExportModal';
+import { ResetModal } from './components/ResetModal';
 import { 
   ZoomIn, 
   ZoomOut, 
@@ -30,7 +31,8 @@ const MainLayout: React.FC = () => {
     redo,
     closeFactionModal,
     closeAllianceModal,
-    closeProvinceDrawer
+    closeProvinceDrawer,
+    closeResetModal
   } = useMurim();
 
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -70,12 +72,13 @@ const MainLayout: React.FC = () => {
         closeFactionModal();
         closeAllianceModal();
         closeProvinceDrawer();
+        closeResetModal();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [undo, redo, setActiveTool, setBrushTarget, closeFactionModal, closeAllianceModal, closeProvinceDrawer]);
+  }, [undo, redo, setActiveTool, setBrushTarget, closeFactionModal, closeAllianceModal, closeProvinceDrawer, closeResetModal]);
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-stone-950 font-sans select-none">
@@ -155,6 +158,7 @@ const MainLayout: React.FC = () => {
       <AllianceModal />
       <LandmarkModal />
       <ExportModal svgRef={svgRef} />
+      <ResetModal />
     </div>
   );
 };

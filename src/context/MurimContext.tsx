@@ -14,9 +14,13 @@ import {
 } from '../types/murim';
 import { SACRED_PEAKS_AND_PASSES } from '../data/chinaGeography';
 
-const STORAGE_KEY = 'murim_world_map_project_v1';
+export const STORAGE_KEY = 'murim_world_map_project_v1';
+export const DEFAULT_MAP_TITLE = '武林乾坤全圖 · Great Murim Realm';
+export const DEFAULT_MAP_SUBTITLE = 'Provinces, Major Rivers & Martial Borders of the Central Plains';
+export const DEFAULT_ERA = 'Jianwen Era · Murim Calendar 428';
+export const DEFAULT_SUBDIVIDED_REGIONS: string[] = ['河南', '陕西', '四川', '湖北'];
 
-const DEFAULT_LAYER_SETTINGS: LayerSettings = {
+export const DEFAULT_LAYER_SETTINGS: LayerSettings = {
   showRivers: true,
   showRiverLabels: true,
   showMountains: true,
@@ -89,6 +93,7 @@ interface MurimContextType {
   landmarkModalCoords: [number, number] | null;
   isExportModalOpen: boolean;
   isProvinceDrawerOpen: boolean;
+  isResetModalOpen: boolean;
   activeSidebarTab: 'factions' | 'alliances' | 'subprovinces' | 'landmarks' | 'borders' | 'layers' | 'project';
 
   // Actions
@@ -101,6 +106,7 @@ interface MurimContextType {
   toggleSubdividedRegion: (regionKey: string) => void;
   setSubdividedRegions: (regions: string[]) => void;
   setLayerSettings: (settings: Partial<LayerSettings>) => void;
+  resetLayerSettingsToDefault: () => void;
   setMapTitle: (title: string) => void;
   setMapSubtitle: (sub: string) => void;
   setEra: (era: string) => void;
@@ -113,6 +119,8 @@ interface MurimContextType {
   closeAllianceModal: () => void;
   openLandmarkModal: (landmark?: LandmarkFeature | null, coords?: [number, number]) => void;
   closeLandmarkModal: () => void;
+  openResetModal: () => void;
+  closeResetModal: () => void;
   saveLandmark: (landmark: Omit<LandmarkFeature, 'id'> & { id?: string }) => void;
   deleteLandmark: (id: string) => void;
   resetLandmarksToDefault: () => void;
@@ -151,10 +159,11 @@ interface MurimContextType {
   canUndo: boolean;
   canRedo: boolean;
 
-  // Export / Import
+  // Export / Import / Reset
   exportProjectJson: () => string;
   importProjectJson: (json: string) => boolean;
   resetToCleanSlate: () => void;
+  resetToFactoryDefaults: () => void;
   loadExampleTemplate: () => void;
 }
 
@@ -211,6 +220,7 @@ export const MurimProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [landmarkModalCoords, setLandmarkModalCoords] = useState<[number, number] | null>(null);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isProvinceDrawerOpen, setIsProvinceDrawerOpen] = useState(false);
+  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [activeSidebarTab, setActiveSidebarTab] = useState<'factions' | 'alliances' | 'subprovinces' | 'landmarks' | 'borders' | 'layers' | 'project'>('factions');
 
   // Undo / Redo
@@ -735,6 +745,9 @@ export const MurimProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const openExportModal = useCallback(() => setIsExportModalOpen(true), []);
   const closeExportModal = useCallback(() => setIsExportModalOpen(false), []);
 
+  const openResetModal = useCallback(() => setIsResetModalOpen(true), []);
+  const closeResetModal = useCallback(() => setIsResetModalOpen(false), []);
+
   const openProvinceDrawer = useCallback((key?: string) => {
     if (key) setSelectedProvinceKey(key);
     setIsProvinceDrawerOpen(true);
@@ -742,6 +755,10 @@ export const MurimProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const closeProvinceDrawer = useCallback(() => {
     setIsProvinceDrawerOpen(false);
+  }, []);
+
+  const resetLayerSettingsToDefault = useCallback(() => {
+    setLayerSettingsState(DEFAULT_LAYER_SETTINGS);
   }, []);
 
   // Export / Import
@@ -794,7 +811,7 @@ export const MurimProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setFactions([]);
     setAlliances([]);
     setProvinces({});
-    setSubdividedRegionsState([]);
+    setSubdividedRegionsState(DEFAULT_SUBDIVIDED_REGIONS);
     setFrontierLines([]);
     setLandmarks(defaultLandmarks);
     setCustomPins([]);
@@ -806,7 +823,43 @@ export const MurimProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } catch (e) {
       console.warn('Could not clear localStorage:', e);
     }
-  }, [pushSnapshot]);
+  }, [pushSnapshot, defaultLandmarks]);
+
+  const resetToFactoryDefaults = useCallback(() => {
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem('murim_map_save');
+    } catch (e) {
+      console.warn('Could not clear localStorage:', e);
+    }
+    setFactions([]);
+    setAlliances([]);
+    setProvinces({});
+    setSubdividedRegionsState(DEFAULT_SUBDIVIDED_REGIONS);
+    setFrontierLines([]);
+    setLandmarks(defaultLandmarks);
+    setCustomPins([]);
+    setLayerSettingsState(DEFAULT_LAYER_SETTINGS);
+    setMapMode('parchment');
+    setMapTitle(DEFAULT_MAP_TITLE);
+    setMapSubtitle(DEFAULT_MAP_SUBTITLE);
+    setEra(DEFAULT_ERA);
+    setActiveTool('brush');
+    setBrushTarget('faction');
+    setSelectedFactionId(null);
+    setSelectedAllianceId(null);
+    setSelectedProvinceKey(null);
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+    setHistoryPast([]);
+    setHistoryFuture([]);
+    setIsFactionModalOpen(false);
+    setIsAllianceModalOpen(false);
+    setIsLandmarkModalOpen(false);
+    setIsExportModalOpen(false);
+    setIsProvinceDrawerOpen(false);
+    setIsResetModalOpen(false);
+  }, [defaultLandmarks]);
 
   // Optional template loader (only used if user clicks "Import Example Template")
   const loadExampleTemplate = useCallback(() => {
@@ -927,6 +980,7 @@ export const MurimProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         landmarkModalCoords,
         isExportModalOpen,
         isProvinceDrawerOpen,
+        isResetModalOpen,
         activeSidebarTab,
         setActiveTool,
         setBrushTarget,
@@ -937,6 +991,7 @@ export const MurimProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         toggleSubdividedRegion,
         setSubdividedRegions,
         setLayerSettings,
+        resetLayerSettingsToDefault,
         setMapTitle,
         setMapSubtitle,
         setEra,
@@ -947,6 +1002,8 @@ export const MurimProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         closeAllianceModal,
         openLandmarkModal,
         closeLandmarkModal,
+        openResetModal,
+        closeResetModal,
         saveLandmark,
         deleteLandmark,
         resetLandmarksToDefault,
@@ -977,6 +1034,7 @@ export const MurimProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         exportProjectJson,
         importProjectJson,
         resetToCleanSlate,
+        resetToFactoryDefaults,
         loadExampleTemplate
       }}
     >

@@ -35,6 +35,7 @@ export const MapHeader: React.FC = () => {
     canUndo,
     canRedo,
     resetView,
+    openResetModal,
     openExportModal
   } = useMurim();
 
@@ -201,9 +202,19 @@ export const MapHeader: React.FC = () => {
         <button
           onClick={resetView}
           className="p-1.5 rounded text-stone-400 hover:text-amber-300 hover:bg-stone-900 transition-colors"
-          title="Reset View & Center on Realm"
+          title="Reset Camera & Center on Realm"
         >
           <RotateCcw className="w-4 h-4" />
+        </button>
+
+        {/* Full Reset / Defaults Modal Button */}
+        <button
+          onClick={openResetModal}
+          className="flex items-center space-x-1 px-2.5 py-1.5 rounded bg-stone-900 hover:bg-rose-950/60 border border-stone-700/80 hover:border-rose-700/70 text-stone-300 hover:text-rose-300 text-xs font-medium transition-all"
+          title="Full Reset, Clear Browser Cache, or Restore Defaults"
+        >
+          <RotateCcw className="w-3.5 h-3.5 text-rose-400" />
+          <span>Reset</span>
         </button>
 
         {/* Export Button */}
