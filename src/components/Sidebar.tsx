@@ -1199,7 +1199,7 @@ export const Sidebar: React.FC = () => {
                                 >
                                   <div className="flex items-center space-x-1.5 truncate mr-2">
                                     <span className="font-semibold text-stone-200">
-                                      {subMeta.name}
+                                      {subState.customDisplayName || subMeta.name}
                                     </span>
                                     <span className="text-[11px] text-stone-400 font-serif">
                                       ({subCleanName})

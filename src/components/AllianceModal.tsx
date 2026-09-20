@@ -11,7 +11,7 @@ const ALLIANCE_COLORS = [
 ];
 
 export const AllianceModal: React.FC = () => {
-  const { isAllianceModalOpen, closeAllianceModal, editingAlliance, saveAlliance } = useMurim();
+  const { isAllianceModalOpen, closeAllianceModal, editingAlliance, saveAlliance, provinces } = useMurim();
 
   const [name, setName] = useState('');
   const [hanzi, setHanzi] = useState('');
@@ -306,7 +306,7 @@ export const AllianceModal: React.FC = () => {
                         isSelected ? 'bg-amber-500 border-amber-300' : 'border-stone-600'
                       }`} 
                     />
-                    <span className="truncate">{meta.name} ({hanziKey})</span>
+                    <span className="truncate">{provinces[hanziKey]?.customDisplayName || meta.name} ({hanziKey})</span>
                   </button>
                 );
               })}

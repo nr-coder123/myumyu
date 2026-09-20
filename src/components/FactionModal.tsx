@@ -23,7 +23,7 @@ const ALIGNMENTS: AlignmentType[] = [
 ];
 
 export const FactionModal: React.FC = () => {
-  const { isFactionModalOpen, closeFactionModal, editingFaction, saveFaction } = useMurim();
+  const { isFactionModalOpen, closeFactionModal, editingFaction, saveFaction, provinces } = useMurim();
 
   const [name, setName] = useState('');
   const [hanzi, setHanzi] = useState('');
@@ -239,7 +239,7 @@ export const FactionModal: React.FC = () => {
                 <option value="">-- No Primary HQ --</option>
                 {Object.entries(PROVINCE_METADATA).map(([hanziKey, meta]) => (
                   <option key={hanziKey} value={hanziKey}>
-                    {meta.name} ({hanziKey}) - {meta.region}
+                    {provinces[hanziKey]?.customDisplayName || meta.name} ({hanziKey}) - {meta.region}
                   </option>
                 ))}
               </select>

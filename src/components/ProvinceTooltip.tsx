@@ -48,11 +48,11 @@ export const ProvinceTooltip: React.FC<ProvinceTooltipProps> = ({ province, posi
                 {province.key}
               </span>
               <span className="text-stone-300 text-sm font-semibold">
-                {province.meta.name}
+                {state.customDisplayName || province.meta.name}
               </span>
             </div>
             <p className="text-[10px] text-amber-500/90 font-serif italic">
-              {state.customDisplayName || province.meta.historicalName}
+              {province.meta.historicalName}
             </p>
           </div>
           <span className="text-[9px] px-1.5 py-0.5 rounded bg-stone-900 border border-stone-700 text-stone-400">

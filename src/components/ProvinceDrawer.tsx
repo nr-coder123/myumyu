@@ -75,7 +75,7 @@ export const ProvinceDrawer: React.FC = () => {
         <div>
           <div className="flex items-center space-x-2">
             <span className="font-serif font-black text-2xl text-amber-300">
-              {meta.name}
+              {state.customDisplayName || meta.name}
             </span>
             <span className="text-stone-400 font-serif text-base">
               ({meta.hanzi || selectedProvinceKey})

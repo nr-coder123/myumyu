@@ -929,17 +929,20 @@ export const MurimMapCanvas: React.FC<MurimMapCanvasProps> = ({ svgRef: external
                 const currentFontSize = p.isSubdivision ? baseFontSize * 0.8 : baseFontSize;
                 const currentStroke = p.isSubdivision ? baseStroke * 0.8 : baseStroke;
 
-                let labelText = p.meta.name;
+                const customName = state?.customDisplayName?.trim();
+                const primaryName = customName || p.meta.name;
+
+                let labelText = primaryName;
                 if (layerSettings.nameLanguage === 'hanzi') {
-                  labelText = p.key;
+                  labelText = customName || p.key;
                 } else if (layerSettings.nameLanguage === 'both') {
                   // In compact/small sizes, show either name or dual format
-                  labelText = p.isSubdivision ? p.meta.name : `${p.meta.name} · ${p.key}`;
+                  labelText = p.isSubdivision ? primaryName : `${primaryName} · ${p.key}`;
                 } else if (layerSettings.nameLanguage === 'historical') {
-                  labelText = state?.customDisplayName || p.meta.historicalName || p.meta.name;
+                  labelText = customName || p.meta.historicalName || p.meta.name;
                 } else {
-                  // 'english' -> Romanized text
-                  labelText = p.meta.name;
+                  // 'english' -> Romanized text or custom display name
+                  labelText = primaryName;
                 }
 
                 const hasEmblem = layerSettings.showFactionEmblems && !!faction;
