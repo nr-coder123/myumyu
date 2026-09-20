@@ -35,7 +35,9 @@ const DEFAULT_LAYER_SETTINGS: LayerSettings = {
   showGraticule: false,
   showTerrainShading: true,
   provinceBorderWidth: 1.5,
-  provinceBorderOpacity: 0.85
+  provinceBorderOpacity: 0.85,
+  allianceHoleFilterThreshold: 0.05,
+  allianceSliverFilterThreshold: 0.005
 };
 
 interface HistorySnapshot {

@@ -294,7 +294,11 @@ function cleanAndFixMultiPolygon(
  * Union and dissolve member provinces belonging to the same alliance
  * into a single unified outer perimeter border SVG path without internal line collisions.
  */
-export function getMergedAlliancePath(memberProvinces: ProcessedProvince[]): string {
+export function getMergedAlliancePath(
+  memberProvinces: ProcessedProvince[],
+  minHoleArea: number = 0.05,
+  minPolyArea: number = 0.005
+): string {
   if (!memberProvinces || memberProvinces.length === 0) return '';
   if (memberProvinces.length === 1) return memberProvinces[0].pathD;
 
@@ -332,7 +336,7 @@ export function getMergedAlliancePath(memberProvinces: ProcessedProvince[]): str
       return memberProvinces.map(p => p.pathD).join(' ');
     }
 
-    const correctedCoordinates = cleanAndFixMultiPolygon(unionResult);
+    const correctedCoordinates = cleanAndFixMultiPolygon(unionResult, minHoleArea, minPolyArea);
 
     if (!correctedCoordinates || correctedCoordinates.length === 0) {
       return memberProvinces.map(p => p.pathD).join(' ');

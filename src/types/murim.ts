@@ -136,6 +136,8 @@ export interface LayerSettings {
   showTerrainShading: boolean;
   provinceBorderWidth: number;
   provinceBorderOpacity: number;
+  allianceHoleFilterThreshold?: number;
+  allianceSliverFilterThreshold?: number;
 }
 
 export interface MurimMapProject {

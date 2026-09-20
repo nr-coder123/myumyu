@@ -18,6 +18,7 @@ import {
   MapPin,
   Mountain,
   Crosshair,
+  Sliders,
   LucideIcon
 } from 'lucide-react';
 import { useMurim } from '../context/MurimContext';
@@ -342,6 +343,90 @@ export const Sidebar: React.FC = () => {
               </button>
             </div>
 
+            {/* Adjustable Sliver & Micro-Hole Filter Control */}
+            <div className="p-3 bg-stone-900/90 rounded-xl border border-amber-900/40 space-y-2.5 shadow-sm">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-1.5">
+                  <Sliders className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="text-xs font-bold text-amber-200">Border Hole & Gap Filter</span>
+                </div>
+                <span className="text-[10px] font-mono text-amber-300 bg-amber-950/80 px-2 py-0.5 rounded border border-amber-800/60">
+                  {(layerSettings.allianceHoleFilterThreshold ?? 0.05).toFixed(3)} deg²
+                </span>
+              </div>
+
+              <p className="text-[11px] text-stone-400 leading-tight">
+                Adjust sensitivity to automatically close gaps and micro-holes along shared province borders when merging alliances.
+              </p>
+
+              {/* Quick Presets */}
+              <div className="flex items-center gap-1">
+                {[
+                  { label: 'Off', val: 0.0 },
+                  { label: 'Mild', val: 0.015 },
+                  { label: 'Standard', val: 0.05 },
+                  { label: 'High', val: 0.15 },
+                  { label: 'Max', val: 0.40 },
+                ].map(preset => {
+                  const isCurrent = Math.abs((layerSettings.allianceHoleFilterThreshold ?? 0.05) - preset.val) < 0.005;
+                  return (
+                    <button
+                      key={preset.label}
+                      onClick={() => setLayerSettings({
+                        allianceHoleFilterThreshold: preset.val,
+                        allianceSliverFilterThreshold: preset.val === 0 ? 0 : Math.max(0.002, preset.val * 0.1)
+                      })}
+                      className={`flex-1 py-1 text-[10px] font-semibold rounded border transition-colors ${
+                        isCurrent
+                          ? 'bg-amber-600 border-amber-500 text-stone-950 font-bold shadow'
+                          : 'bg-stone-950 border-stone-800 text-stone-300 hover:bg-stone-800'
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Fine-Tuning Range Slider for Hole Dissolve Size */}
+              <div className="space-y-1 pt-1">
+                <div className="flex justify-between text-[10px] text-stone-400">
+                  <span>Hole Dissolve Threshold:</span>
+                  <span className="font-mono text-stone-200">{(layerSettings.allianceHoleFilterThreshold ?? 0.05).toFixed(3)} deg²</span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={0.5}
+                  step={0.005}
+                  value={layerSettings.allianceHoleFilterThreshold ?? 0.05}
+                  onChange={e => setLayerSettings({ allianceHoleFilterThreshold: parseFloat(e.target.value) })}
+                  className="w-full accent-amber-500 h-1.5 bg-stone-950 rounded cursor-pointer"
+                />
+                <div className="flex justify-between text-[9px] text-stone-500">
+                  <span>0.000 (Keep all holes)</span>
+                  <span>0.500 (Close large gaps)</span>
+                </div>
+              </div>
+
+              {/* Sliver Island Filter Slider */}
+              <div className="space-y-1 pt-1 border-t border-stone-800/60">
+                <div className="flex justify-between text-[10px] text-stone-400">
+                  <span>Micro-Sliver Island Removal:</span>
+                  <span className="font-mono text-stone-200">{(layerSettings.allianceSliverFilterThreshold ?? 0.005).toFixed(3)} deg²</span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={0.05}
+                  step={0.001}
+                  value={layerSettings.allianceSliverFilterThreshold ?? 0.005}
+                  onChange={e => setLayerSettings({ allianceSliverFilterThreshold: parseFloat(e.target.value) })}
+                  className="w-full accent-amber-500 h-1.5 bg-stone-950 rounded cursor-pointer"
+                />
+              </div>
+            </div>
+
             {alliances.length === 0 ? (
               <div className="p-4 bg-stone-900/60 rounded-xl border border-dashed border-stone-800 text-center space-y-2.5">
                 <div className="w-10 h-10 rounded-full bg-stone-800/80 flex items-center justify-center mx-auto text-amber-500">
@@ -489,6 +574,90 @@ export const Sidebar: React.FC = () => {
               <p className="text-[11px] text-stone-400">
                 Customize individual province border thickness, color & style
               </p>
+            </div>
+
+            {/* Adjustable Sliver & Micro-Hole Filter Control */}
+            <div className="p-3 bg-stone-900/90 rounded-xl border border-amber-900/40 space-y-2.5 shadow-sm">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-1.5">
+                  <Sliders className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="text-xs font-bold text-amber-200">Border Hole & Gap Filter</span>
+                </div>
+                <span className="text-[10px] font-mono text-amber-300 bg-amber-950/80 px-2 py-0.5 rounded border border-amber-800/60">
+                  {(layerSettings.allianceHoleFilterThreshold ?? 0.05).toFixed(3)} deg²
+                </span>
+              </div>
+
+              <p className="text-[11px] text-stone-400 leading-tight">
+                Adjust sensitivity to automatically close gaps and micro-holes along shared province borders when merging alliances.
+              </p>
+
+              {/* Quick Presets */}
+              <div className="flex items-center gap-1">
+                {[
+                  { label: 'Off', val: 0.0 },
+                  { label: 'Mild', val: 0.015 },
+                  { label: 'Standard', val: 0.05 },
+                  { label: 'High', val: 0.15 },
+                  { label: 'Max', val: 0.40 },
+                ].map(preset => {
+                  const isCurrent = Math.abs((layerSettings.allianceHoleFilterThreshold ?? 0.05) - preset.val) < 0.005;
+                  return (
+                    <button
+                      key={preset.label}
+                      onClick={() => setLayerSettings({
+                        allianceHoleFilterThreshold: preset.val,
+                        allianceSliverFilterThreshold: preset.val === 0 ? 0 : Math.max(0.002, preset.val * 0.1)
+                      })}
+                      className={`flex-1 py-1 text-[10px] font-semibold rounded border transition-colors ${
+                        isCurrent
+                          ? 'bg-amber-600 border-amber-500 text-stone-950 font-bold shadow'
+                          : 'bg-stone-950 border-stone-800 text-stone-300 hover:bg-stone-800'
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Fine-Tuning Range Slider for Hole Dissolve Size */}
+              <div className="space-y-1 pt-1">
+                <div className="flex justify-between text-[10px] text-stone-400">
+                  <span>Hole Dissolve Threshold:</span>
+                  <span className="font-mono text-stone-200">{(layerSettings.allianceHoleFilterThreshold ?? 0.05).toFixed(3)} deg²</span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={0.5}
+                  step={0.005}
+                  value={layerSettings.allianceHoleFilterThreshold ?? 0.05}
+                  onChange={e => setLayerSettings({ allianceHoleFilterThreshold: parseFloat(e.target.value) })}
+                  className="w-full accent-amber-500 h-1.5 bg-stone-950 rounded cursor-pointer"
+                />
+                <div className="flex justify-between text-[9px] text-stone-500">
+                  <span>0.000 (Keep all holes)</span>
+                  <span>0.500 (Close large gaps)</span>
+                </div>
+              </div>
+
+              {/* Sliver Island Filter Slider */}
+              <div className="space-y-1 pt-1 border-t border-stone-800/60">
+                <div className="flex justify-between text-[10px] text-stone-400">
+                  <span>Micro-Sliver Island Removal:</span>
+                  <span className="font-mono text-stone-200">{(layerSettings.allianceSliverFilterThreshold ?? 0.005).toFixed(3)} deg²</span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={0.05}
+                  step={0.001}
+                  value={layerSettings.allianceSliverFilterThreshold ?? 0.005}
+                  onChange={e => setLayerSettings({ allianceSliverFilterThreshold: parseFloat(e.target.value) })}
+                  className="w-full accent-amber-500 h-1.5 bg-stone-950 rounded cursor-pointer"
+                />
+              </div>
             </div>
 
             {/* Quick province selector to edit border */}
@@ -770,7 +939,7 @@ export const Sidebar: React.FC = () => {
             </div>
 
             {/* Alliance & Border Overlays */}
-            <div className="p-3 bg-stone-900/80 rounded-lg border border-stone-800 space-y-2">
+            <div className="p-3 bg-stone-900/80 rounded-lg border border-stone-800 space-y-2.5">
               <span className="font-bold text-stone-300 block mb-1">Alliance & Frontier Displays</span>
               <label className="flex items-center justify-between text-stone-300 cursor-pointer">
                 <span>Alliance Boundary Outlines</span>
@@ -799,6 +968,29 @@ export const Sidebar: React.FC = () => {
                   className="accent-amber-500"
                 />
               </label>
+
+              {/* Sliver & Hole Threshold in Layers Tab */}
+              <div className="pt-2 border-t border-stone-800 space-y-1.5">
+                <div className="flex justify-between text-[11px] text-stone-400">
+                  <span className="font-medium text-stone-300">Alliance Border Hole Dissolve:</span>
+                  <span className="font-mono text-amber-400 font-bold">
+                    {(layerSettings.allianceHoleFilterThreshold ?? 0.05).toFixed(3)} deg²
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={0.5}
+                  step={0.005}
+                  value={layerSettings.allianceHoleFilterThreshold ?? 0.05}
+                  onChange={e => setLayerSettings({ allianceHoleFilterThreshold: parseFloat(e.target.value) })}
+                  className="w-full accent-amber-500 h-1.5 bg-stone-950 rounded cursor-pointer"
+                />
+                <div className="flex justify-between text-[9px] text-stone-500">
+                  <span>0.000 (Keep holes)</span>
+                  <span>0.500 (Close all seam holes)</span>
+                </div>
+              </div>
             </div>
 
             {/* Cartographic Decorations */}

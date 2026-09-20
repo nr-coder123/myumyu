@@ -319,12 +319,54 @@ export const MurimMapCanvas: React.FC<MurimMapCanvasProps> = ({ svgRef: external
     return isClaimed ? 0.9 : 0.6;
   }, [provinceStates, mapMode]);
 
-  // Filter rendered rivers
+  // Filter rendered rivers and calculate dynamic label placements along river flow
   const renderedRivers = useMemo(() => {
-    return CHINA_RIVERS.map(r => ({
-      river: r,
-      pathD: getRiverPath(r)
-    })).filter(r => r.pathD.length > 0);
+    return CHINA_RIVERS.map(r => {
+      const pathD = getRiverPath(r);
+      const pts = r.coordinates.map(c => projectCoordinates(c)).filter((p): p is [number, number] => p !== null);
+
+      let labelPos: { x: number; y: number; angle: number } | null = null;
+      if (pts.length >= 2) {
+        let totalLen = 0;
+        const dists = [0];
+        for (let i = 0; i < pts.length - 1; i++) {
+          const dx = pts[i + 1][0] - pts[i][0];
+          const dy = pts[i + 1][1] - pts[i][1];
+          totalLen += Math.hypot(dx, dy);
+          dists.push(totalLen);
+        }
+
+        // Place label at 50% along the river polyline
+        const targetDist = totalLen * 0.5;
+        let segIdx = 0;
+        for (let i = 0; i < dists.length - 1; i++) {
+          if (dists[i + 1] >= targetDist) {
+            segIdx = i;
+            break;
+          }
+        }
+
+        const p1 = pts[segIdx];
+        const p2 = pts[segIdx + 1];
+        const segLen = dists[segIdx + 1] - dists[segIdx];
+        const t = segLen > 0 ? (targetDist - dists[segIdx]) / segLen : 0.5;
+
+        const x = p1[0] + (p2[0] - p1[0]) * t;
+        const y = p1[1] + (p2[1] - p1[1]) * t;
+
+        let angle = Math.atan2(p2[1] - p1[1], p2[0] - p1[0]) * (180 / Math.PI);
+        if (angle > 90) angle -= 180;
+        if (angle < -90) angle += 180;
+
+        labelPos = { x, y, angle };
+      }
+
+      return {
+        river: r,
+        pathD,
+        labelPos
+      };
+    }).filter(r => r.pathD.length > 0);
   }, []);
 
   // Filter and project dynamic landmarks & passes from context
@@ -339,6 +381,9 @@ export const MurimMapCanvas: React.FC<MurimMapCanvasProps> = ({ svgRef: external
   // Compute merged outer perimeter SVG path for each alliance (dissolving internal province borders)
   const allianceMergedPaths = useMemo(() => {
     const map: Record<string, string> = {};
+    const minHoleArea = layerSettings.allianceHoleFilterThreshold ?? 0.05;
+    const minPolyArea = layerSettings.allianceSliverFilterThreshold ?? 0.005;
+
     for (const alliance of alliances) {
       const memberProvs = processedProvinces.filter(p => {
         const state = provinceStates[p.key];
@@ -347,11 +392,11 @@ export const MurimMapCanvas: React.FC<MurimMapCanvasProps> = ({ svgRef: external
         return isDirect || isParentInAlliance;
       });
       if (memberProvs.length > 0) {
-        map[alliance.id] = getMergedAlliancePath(memberProvs);
+        map[alliance.id] = getMergedAlliancePath(memberProvs, minHoleArea, minPolyArea);
       }
     }
     return map;
-  }, [alliances, processedProvinces, provinceStates]);
+  }, [alliances, processedProvinces, provinceStates, layerSettings.allianceHoleFilterThreshold, layerSettings.allianceSliverFilterThreshold]);
 
   return (
     <div 
@@ -642,30 +687,48 @@ export const MurimMapCanvas: React.FC<MurimMapCanvasProps> = ({ svgRef: external
             </g>
           )}
 
-          {/* River Names */}
+          {/* River Names (Dynamically positioned along real river flow paths) */}
           {layerSettings.showRivers && layerSettings.showRiverLabels && (
-            <g className="river-labels font-serif text-[11px] font-bold italic pointer-events-none" fill={mapMode === 'parchment' ? '#2c3e50' : '#7dd3fc'}>
-              <text x={950} y={575} opacity={0.85}>
-                {layerSettings.nameLanguage === 'hanzi' ? '長江' : (layerSettings.nameLanguage === 'both' ? 'Yangtze River · 長江' : 'Yangtze River')}
-              </text>
-              <text x={960} y={435} opacity={0.85}>
-                {layerSettings.nameLanguage === 'hanzi' ? '黃河' : (layerSettings.nameLanguage === 'both' ? 'Yellow River · 黃河' : 'Yellow River')}
-              </text>
-              <text x={940} y={470} opacity={0.75}>
-                {layerSettings.nameLanguage === 'hanzi' ? '渭水' : (layerSettings.nameLanguage === 'both' ? 'Wei River · 渭水' : 'Wei River')}
-              </text>
-              <text x={1040} y={540} opacity={0.75}>
-                {layerSettings.nameLanguage === 'hanzi' ? '漢江' : (layerSettings.nameLanguage === 'both' ? 'Han River · 漢江' : 'Han River')}
-              </text>
-              <text x={1010} y={760} opacity={0.75}>
-                {layerSettings.nameLanguage === 'hanzi' ? '珠江' : (layerSettings.nameLanguage === 'both' ? 'Pearl River · 珠江' : 'Pearl River')}
-              </text>
-              <text x={1085} y={520} opacity={0.75}>
-                {layerSettings.nameLanguage === 'hanzi' ? '淮河' : (layerSettings.nameLanguage === 'both' ? 'Huai River · 淮河' : 'Huai River')}
-              </text>
-              <text x={1120} y={460} opacity={0.75}>
-                {layerSettings.nameLanguage === 'hanzi' ? '大運河' : (layerSettings.nameLanguage === 'both' ? 'Grand Canal · 大運河' : 'Grand Canal')}
-              </text>
+            <g className="river-labels font-serif text-[10px] font-bold italic pointer-events-none select-none">
+              {renderedRivers.map(({ river, labelPos }) => {
+                if (!labelPos) return null;
+                const labelText = layerSettings.nameLanguage === 'hanzi'
+                  ? river.hanzi
+                  : (layerSettings.nameLanguage === 'both' ? `${river.name} · ${river.hanzi}` : river.name);
+                const textColor = mapMode === 'parchment' ? '#2c3e50' : '#7dd3fc';
+                const glowColor = mapMode === 'parchment' ? '#ede2cc' : '#0a1926';
+
+                return (
+                  <g
+                    key={`river-label-${river.id}`}
+                    transform={`translate(${labelPos.x}, ${labelPos.y}) rotate(${labelPos.angle})`}
+                  >
+                    {/* Background halo for legibility over terrain and fills */}
+                    <text
+                      x={0}
+                      y={-4}
+                      textAnchor="middle"
+                      fill={glowColor}
+                      stroke={glowColor}
+                      strokeWidth={3}
+                      strokeLinejoin="round"
+                      opacity={0.85}
+                    >
+                      {labelText}
+                    </text>
+                    {/* Foreground river title */}
+                    <text
+                      x={0}
+                      y={-4}
+                      textAnchor="middle"
+                      fill={textColor}
+                      opacity={0.9}
+                    >
+                      {labelText}
+                    </text>
+                  </g>
+                );
+              })}
             </g>
           )}
 
