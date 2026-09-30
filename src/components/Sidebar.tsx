@@ -20,6 +20,7 @@ import {
   Crosshair,
   Sliders,
   RotateCcw,
+  Hash,
   LucideIcon
 } from 'lucide-react';
 import { useMurim } from '../context/MurimContext';
@@ -59,6 +60,8 @@ export const Sidebar: React.FC = () => {
     deleteLandmark,
     openExportModal,
     openProvinceDrawer,
+    saveFaction,
+    saveAlliance,
     deleteFaction,
     deleteAlliance,
     setSelectedFactionId,
@@ -98,6 +101,20 @@ export const Sidebar: React.FC = () => {
   ];
 
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
+
+  const normalizeHexColor = (input: string, fallback = '#e11d48'): string => {
+    let val = input.trim();
+    if (!val) return fallback;
+    if (!val.startsWith('#')) val = '#' + val;
+    if (/^#[0-9A-Fa-f]{3}$/.test(val)) {
+      const r = val[1], g = val[2], b = val[3];
+      return `#${r}${r}${g}${g}${b}${b}`.toLowerCase();
+    }
+    if (/^#[0-9A-Fa-f]{6}$/.test(val)) {
+      return val.toLowerCase();
+    }
+    return fallback;
+  };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -245,10 +262,22 @@ export const Sidebar: React.FC = () => {
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-2">
+                          {/* Interactive Color Swatch with Spectrum Picker */}
                           <div 
-                            className="w-4 h-4 rounded-full border border-stone-400 shadow-sm flex items-center justify-center"
+                            className="w-4 h-4 rounded-full border border-stone-400 shadow-sm relative overflow-hidden cursor-pointer shrink-0"
                             style={{ backgroundColor: faction.color }}
-                          />
+                            title="Click to pick color spectrum"
+                          >
+                            <input
+                              type="color"
+                              value={faction.color}
+                              onChange={e => {
+                                const norm = normalizeHexColor(e.target.value, faction.color);
+                                saveFaction({ ...faction, color: norm });
+                              }}
+                              className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                            />
+                          </div>
                           <div>
                             <div className="flex items-center space-x-1.5">
                               <span className="font-bold text-xs text-stone-100">
@@ -260,7 +289,7 @@ export const Sidebar: React.FC = () => {
                                 </span>
                               )}
                             </div>
-                            <div className="flex items-center space-x-1.5 text-[10px] text-stone-400">
+                            <div className="flex items-center space-x-1.5 text-[10px] text-stone-400 mt-0.5">
                               <span>{faction.alignment}</span>
                               {faction.hqProvinceId && <span>· HQ: {faction.hqProvinceId}</span>}
                             </div>
@@ -297,21 +326,51 @@ export const Sidebar: React.FC = () => {
                         </div>
                       </div>
 
-                      {/* Ledger stats & fast paint trigger */}
+                      {/* Color Code Input & Ledger stats */}
                       <div className="flex items-center justify-between pt-1 border-t border-stone-800/60 text-[10px]">
-                        <span className="text-stone-400">
-                          Controlled Provinces: <strong className="text-amber-300">{claimedCount}</strong>
-                        </span>
-                        <button
-                          onClick={() => {
-                            setSelectedFactionId(faction.id);
-                            setBrushTarget('faction');
-                            setActiveTool('brush');
-                          }}
-                          className="text-amber-400 hover:text-amber-300 underline font-medium"
-                        >
-                          Select as Active Brush
-                        </button>
+                        <div className="flex items-center space-x-1.5">
+                          <span className="text-stone-500">Color:</span>
+                          <div 
+                            className="flex items-center bg-stone-950 border border-stone-800 hover:border-amber-700/60 focus-within:border-amber-500 rounded px-1.5 py-0.5 space-x-1 transition-colors"
+                            title="Edit Sect Color Code (e.g. #ff0000, #3b82f6)"
+                          >
+                            <Hash className="w-2.5 h-2.5 text-stone-500" />
+                            <input
+                              type="text"
+                              defaultValue={faction.color}
+                              key={faction.color}
+                              maxLength={9}
+                              onBlur={e => {
+                                const norm = normalizeHexColor(e.target.value, faction.color);
+                                if (norm !== faction.color) {
+                                  saveFaction({ ...faction, color: norm });
+                                }
+                              }}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') {
+                                  (e.target as HTMLInputElement).blur();
+                                }
+                              }}
+                              className="w-16 bg-transparent font-mono text-[10px] text-amber-300 uppercase focus:outline-none"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex items-center space-x-2">
+                          <span className="text-stone-400">
+                            Provinces: <strong className="text-amber-300">{claimedCount}</strong>
+                          </span>
+                          <button
+                            onClick={() => {
+                              setSelectedFactionId(faction.id);
+                              setBrushTarget('faction');
+                              setActiveTool('brush');
+                            }}
+                            className="text-amber-400 hover:text-amber-300 underline font-medium"
+                          >
+                            Select
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );
@@ -470,10 +529,22 @@ export const Sidebar: React.FC = () => {
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-2">
+                          {/* Interactive Color Swatch with Spectrum Picker */}
                           <div 
-                            className="w-4 h-4 rounded border border-stone-400 shadow-sm"
+                            className="w-4 h-4 rounded border border-stone-400 shadow-sm relative overflow-hidden cursor-pointer shrink-0"
                             style={{ backgroundColor: alliance.color }}
-                          />
+                            title="Click to pick color spectrum"
+                          >
+                            <input
+                              type="color"
+                              value={alliance.color}
+                              onChange={e => {
+                                const norm = normalizeHexColor(e.target.value, alliance.color);
+                                saveAlliance({ ...alliance, color: norm });
+                              }}
+                              className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                            />
+                          </div>
                           <div>
                             <div className="flex items-center space-x-1.5">
                               <span className="font-bold text-xs text-stone-100">
@@ -521,11 +592,34 @@ export const Sidebar: React.FC = () => {
                         </div>
                       </div>
 
-                      {/* Border Style Indicator */}
+                      {/* Border Style Indicator & Color Code */}
                       <div className="p-1.5 bg-stone-950/80 rounded border border-stone-800/80 flex items-center justify-between text-[10px]">
-                        <span className="text-stone-400">Border Outline:</span>
-                        <span className="font-mono text-amber-300 font-medium">
-                          {alliance.strokeWidth}px · {alliance.strokeStyle} · {alliance.fillPattern}
+                        <div className="flex items-center space-x-1">
+                          <span className="text-stone-500">Color:</span>
+                          <div className="flex items-center bg-stone-900 border border-stone-800 rounded px-1 py-0.5 space-x-0.5">
+                            <Hash className="w-2.5 h-2.5 text-stone-500" />
+                            <input
+                              type="text"
+                              defaultValue={alliance.color}
+                              key={alliance.color}
+                              maxLength={9}
+                              onBlur={e => {
+                                const norm = normalizeHexColor(e.target.value, alliance.color);
+                                if (norm !== alliance.color) {
+                                  saveAlliance({ ...alliance, color: norm });
+                                }
+                              }}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') {
+                                  (e.target as HTMLInputElement).blur();
+                                }
+                              }}
+                              className="w-14 bg-transparent font-mono text-[9px] text-amber-300 uppercase focus:outline-none"
+                            />
+                          </div>
+                        </div>
+                        <span className="font-mono text-stone-400">
+                          {alliance.strokeWidth}px · {alliance.strokeStyle}
                         </span>
                       </div>
 

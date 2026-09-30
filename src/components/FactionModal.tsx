@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Check, Swords, Palette } from 'lucide-react';
+import { X, Check, Swords, Palette, Hash, Copy } from 'lucide-react';
 import { useMurim } from '../context/MurimContext';
 import { AlignmentType } from '../types/murim';
 import { FACTION_ICONS } from '../utils/factionIcons';
@@ -28,17 +28,70 @@ export const FactionModal: React.FC = () => {
   const [name, setName] = useState('');
   const [hanzi, setHanzi] = useState('');
   const [color, setColor] = useState('#e11d48');
+  const [colorInput, setColorInput] = useState('#e11d48');
   const [alignment, setAlignment] = useState<AlignmentType>('Righteous');
   const [leader, setLeader] = useState('');
   const [hqProvinceId, setHqProvinceId] = useState('');
   const [icon, setIcon] = useState('swords');
   const [description, setDescription] = useState('');
 
+  // Helper to test if a string is a valid CSS hex/color
+  const isValidHex = (str: string) => {
+    return /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$/.test(str);
+  };
+
+  const normalizeHex = (input: string): string => {
+    let val = input.trim();
+    if (!val) return '#e11d48';
+    if (!val.startsWith('#')) {
+      val = '#' + val;
+    }
+    if (/^#[0-9A-Fa-f]{3}$/.test(val)) {
+      // expand #rgb to #rrggbb
+      const r = val[1];
+      const g = val[2];
+      const b = val[3];
+      return `#${r}${r}${g}${g}${b}${b}`.toLowerCase();
+    }
+    if (/^#[0-9A-Fa-f]{6}$/.test(val)) {
+      return val.toLowerCase();
+    }
+    return val;
+  };
+
+  const handleColorChange = (newColor: string) => {
+    const norm = normalizeHex(newColor);
+    setColor(norm);
+    setColorInput(newColor.startsWith('#') ? newColor : '#' + newColor);
+  };
+
+  const handleColorInputChange = (raw: string) => {
+    setColorInput(raw);
+    const cleaned = raw.trim();
+    const candidate = cleaned.startsWith('#') ? cleaned : '#' + cleaned;
+    if (isValidHex(candidate)) {
+      setColor(normalizeHex(candidate));
+    }
+  };
+
+  const handleColorInputBlur = () => {
+    const candidate = colorInput.trim().startsWith('#') ? colorInput.trim() : '#' + colorInput.trim();
+    if (isValidHex(candidate)) {
+      const norm = normalizeHex(candidate);
+      setColor(norm);
+      setColorInput(norm);
+    } else {
+      // Revert to current valid color
+      setColorInput(color);
+    }
+  };
+
   useEffect(() => {
     if (editingFaction) {
       setName(editingFaction.name);
       setHanzi(editingFaction.hanzi || '');
       setColor(editingFaction.color);
+      setColorInput(editingFaction.color);
       setAlignment(editingFaction.alignment);
       setLeader(editingFaction.leader || '');
       setHqProvinceId(editingFaction.hqProvinceId || '');
@@ -48,6 +101,7 @@ export const FactionModal: React.FC = () => {
       setName('');
       setHanzi('');
       setColor('#e11d48');
+      setColorInput('#e11d48');
       setAlignment('Righteous');
       setLeader('');
       setHqProvinceId('');
@@ -134,29 +188,69 @@ export const FactionModal: React.FC = () => {
             </div>
           </div>
 
-          {/* Color Picker & Presets */}
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="text-xs font-semibold text-stone-300 flex items-center space-x-1">
+          {/* Color Picker, Hex Code Input & Presets */}
+          <div className="p-3 bg-stone-900/80 rounded-xl border border-stone-800 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold text-stone-300 flex items-center space-x-1.5">
                 <Palette className="w-3.5 h-3.5 text-amber-400" />
                 <span>Faction Sovereign Color</span>
               </label>
-              <div className="flex items-center space-x-1.5">
-                <input
-                  type="color"
-                  value={color}
-                  onChange={e => setColor(e.target.value)}
-                  className="w-6 h-6 rounded border border-stone-700 cursor-pointer bg-transparent"
-                />
-                <span className="font-mono text-xs text-stone-400">{color}</span>
+
+              {/* Hex Code Input & Native Color Picker */}
+              <div className="flex items-center space-x-2">
+                <div className="flex items-center bg-stone-950 border border-stone-700/80 rounded-lg px-2 py-1 space-x-1.5 focus-within:border-amber-500 transition-colors">
+                  <Hash className="w-3 h-3 text-stone-500" />
+                  <input
+                    type="text"
+                    value={colorInput}
+                    onChange={e => handleColorInputChange(e.target.value)}
+                    onBlur={handleColorInputBlur}
+                    placeholder="#ff0000"
+                    maxLength={9}
+                    title="Enter custom hex color code (e.g. #ff0000 or ff0000)"
+                    className="w-20 bg-transparent text-xs font-mono text-amber-300 placeholder-stone-600 focus:outline-none uppercase"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(color);
+                    }}
+                    title="Copy hex code"
+                    className="p-0.5 text-stone-500 hover:text-amber-400 rounded transition-colors"
+                  >
+                    <Copy className="w-3 h-3" />
+                  </button>
+                </div>
+
+                <div 
+                  className="w-7 h-7 rounded-lg border-2 border-stone-700 shadow-inner flex items-center justify-center relative overflow-hidden cursor-pointer group"
+                  style={{ backgroundColor: color }}
+                  title="Click to choose from color spectrum"
+                >
+                  <input
+                    type="color"
+                    value={isValidHex(color) ? color : '#e11d48'}
+                    onChange={e => handleColorChange(e.target.value)}
+                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                  />
+                </div>
               </div>
             </div>
-            <div className="flex flex-wrap gap-1.5 p-2 bg-stone-900/60 rounded-lg border border-stone-800">
+
+            <div className="flex items-center justify-between text-[11px] text-stone-400">
+              <span>Quick Presets:</span>
+              <span className="font-mono text-[10px] text-stone-500">
+                Current: <strong className="text-amber-300 uppercase">{color}</strong>
+              </span>
+            </div>
+
+            <div className="flex flex-wrap gap-1.5 p-2 bg-stone-950/60 rounded-lg border border-stone-800/80">
               {COLOR_PRESETS.map(c => (
                 <button
                   type="button"
                   key={c}
-                  onClick={() => setColor(c)}
+                  onClick={() => handleColorChange(c)}
+                  title={`Preset: ${c}`}
                   className={`w-5 h-5 rounded border transition-transform ${
                     color.toLowerCase() === c.toLowerCase() 
                       ? 'scale-125 border-white ring-2 ring-amber-500 shadow-md' 
