@@ -13,6 +13,7 @@ import {
   LandmarkFeature
 } from '../types/murim';
 import { SACRED_PEAKS_AND_PASSES } from '../data/chinaGeography';
+import { migrateProjectData } from '../utils/projectMigration';
 
 export const STORAGE_KEY = 'murim_world_map_project_v1';
 export const DEFAULT_MAP_TITLE = '武林乾坤全圖 · Great Murim Realm';
@@ -233,22 +234,23 @@ export const MurimProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Load from LocalStorage on mount
   useEffect(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
+      const saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem('murim_map_save');
       if (saved) {
-        const parsed = JSON.parse(saved) as MurimMapProject;
-        if (parsed && parsed.version) {
-          if (Array.isArray(parsed.factions)) setFactions(parsed.factions);
-          if (Array.isArray(parsed.alliances)) setAlliances(parsed.alliances);
-          if (parsed.provinces) setProvinces(parsed.provinces);
-          if (Array.isArray(parsed.subdividedRegions)) setSubdividedRegionsState(parsed.subdividedRegions);
-          if (Array.isArray(parsed.frontierLines)) setFrontierLines(parsed.frontierLines);
-          if (Array.isArray(parsed.landmarks)) setLandmarks(parsed.landmarks);
-          if (Array.isArray(parsed.customPins)) setCustomPins(parsed.customPins);
-          if (parsed.layerSettings) setLayerSettingsState({ ...DEFAULT_LAYER_SETTINGS, ...parsed.layerSettings });
-          if (parsed.mapMode) setMapMode('parchment');
-          if (parsed.title) setMapTitle(parsed.title);
-          if (parsed.subtitle) setMapSubtitle(parsed.subtitle);
-          if (parsed.era) setEra(parsed.era);
+        const raw = JSON.parse(saved);
+        if (raw && typeof raw === 'object') {
+          const migrated = migrateProjectData(raw);
+          setFactions(migrated.factions);
+          setAlliances(migrated.alliances);
+          setProvinces(migrated.provinces);
+          setSubdividedRegionsState(migrated.subdividedRegions || DEFAULT_SUBDIVIDED_REGIONS);
+          setFrontierLines(migrated.frontierLines);
+          setLandmarks(migrated.landmarks || []);
+          setCustomPins(migrated.customPins || []);
+          setLayerSettingsState({ ...DEFAULT_LAYER_SETTINGS, ...migrated.layerSettings });
+          setMapMode(migrated.mapMode || 'parchment');
+          setMapTitle(migrated.title || DEFAULT_MAP_TITLE);
+          setMapSubtitle(migrated.subtitle || DEFAULT_MAP_SUBTITLE);
+          setEra(migrated.era || DEFAULT_ERA);
         }
       }
     } catch (e) {
@@ -764,7 +766,7 @@ export const MurimProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Export / Import
   const exportProjectJson = useCallback(() => {
     const projectData: MurimMapProject = {
-      version: 1,
+      version: 2,
       title: mapTitle,
       subtitle: mapSubtitle,
       era,
@@ -784,21 +786,33 @@ export const MurimProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const importProjectJson = useCallback((jsonStr: string): boolean => {
     try {
-      const data = JSON.parse(jsonStr) as MurimMapProject;
-      if (!data || !data.version) return false;
+      const raw = JSON.parse(jsonStr);
+      if (!raw || typeof raw !== 'object') return false;
+
+      // Migrate any older or current save file
+      const migrated = migrateProjectData(raw);
+
       pushSnapshot();
-      if (Array.isArray(data.factions)) setFactions(data.factions);
-      if (Array.isArray(data.alliances)) setAlliances(data.alliances);
-      if (data.provinces) setProvinces(data.provinces);
-      if (Array.isArray(data.subdividedRegions)) setSubdividedRegionsState(data.subdividedRegions);
-      if (Array.isArray(data.frontierLines)) setFrontierLines(data.frontierLines);
-      if (Array.isArray(data.landmarks)) setLandmarks(data.landmarks);
-      if (Array.isArray(data.customPins)) setCustomPins(data.customPins);
-      if (data.layerSettings) setLayerSettingsState({ ...DEFAULT_LAYER_SETTINGS, ...data.layerSettings });
-      if (data.mapMode) setMapMode(data.mapMode);
-      if (data.title) setMapTitle(data.title);
-      if (data.subtitle) setMapSubtitle(data.subtitle);
-      if (data.era) setEra(data.era);
+      setFactions(migrated.factions);
+      setAlliances(migrated.alliances);
+      setProvinces(migrated.provinces);
+      setSubdividedRegionsState(migrated.subdividedRegions || DEFAULT_SUBDIVIDED_REGIONS);
+      setFrontierLines(migrated.frontierLines);
+      setLandmarks(migrated.landmarks || []);
+      setCustomPins(migrated.customPins || []);
+      setLayerSettingsState({ ...DEFAULT_LAYER_SETTINGS, ...migrated.layerSettings });
+      setMapMode(migrated.mapMode || 'parchment');
+      setMapTitle(migrated.title || DEFAULT_MAP_TITLE);
+      setMapSubtitle(migrated.subtitle || DEFAULT_MAP_SUBTITLE);
+      setEra(migrated.era || DEFAULT_ERA);
+
+      // Also persist the migrated state into localStorage immediately
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
+      } catch (err) {
+        console.warn('Could not save to localStorage after import:', err);
+      }
+
       return true;
     } catch (e) {
       console.error('Import failed:', e);

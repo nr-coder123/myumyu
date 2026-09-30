@@ -406,6 +406,131 @@ export const MurimMapCanvas: React.FC<MurimMapCanvasProps> = ({ svgRef: external
     return map;
   }, [alliances, processedProvinces, provinceStates, layerSettings.allianceHoleFilterThreshold, layerSettings.allianceSliverFilterThreshold]);
 
+  // Group contiguous or adjacent territories claimed by the same sect into unified clusters.
+  // When a sect occupies adjacent territories (e.g. subdivided prefectures or neighboring provinces),
+  // exactly ONE unified shield and ONE sect title are rendered rather than redundant duplicate shields/names.
+  const factionTerritoryClusters = useMemo(() => {
+    if (!layerSettings.showProvinceNames || layerSettings.labelSize === 'off') {
+      return [];
+    }
+
+    const clusters: {
+      id: string;
+      faction: typeof factions[0];
+      center: [number, number];
+      anchorKey?: string;
+      memberProvs: ProcessedProvince[];
+      isMultiProvince: boolean;
+      alliance?: typeof alliances[0];
+    }[] = [];
+
+    const ADJACENCY_DIST = 160; // Max SVG coordinate distance between centers to treat as contiguous domain
+
+    for (const faction of factions) {
+      // Find all visible processed provinces claimed by this faction
+      const claimed = processedProvinces.filter(p => {
+        const state = provinceStates[p.key];
+        const parentState = p.parentKey ? provinceStates[p.parentKey] : undefined;
+        const effectiveFactionId = state?.factionId !== undefined ? state.factionId : parentState?.factionId;
+        return effectiveFactionId === faction.id;
+      });
+
+      if (claimed.length === 0) continue;
+
+      const visited = new Set<string>();
+      let clusterIdx = 0;
+
+      for (const prov of claimed) {
+        if (visited.has(prov.key)) continue;
+
+        const clusterProvs: ProcessedProvince[] = [];
+        const queue: ProcessedProvince[] = [prov];
+        visited.add(prov.key);
+
+        while (queue.length > 0) {
+          const curr = queue.shift()!;
+          clusterProvs.push(curr);
+
+          for (const candidate of claimed) {
+            if (visited.has(candidate.key)) continue;
+
+            const isSameParent = !!(curr.parentKey && candidate.parentKey && curr.parentKey === candidate.parentKey);
+            const isParentChild = curr.parentKey === candidate.key || candidate.parentKey === curr.key;
+            const dist = Math.hypot(curr.center[0] - candidate.center[0], curr.center[1] - candidate.center[1]);
+            const isAdjacent = dist <= ADJACENCY_DIST;
+
+            if (isSameParent || isParentChild || isAdjacent) {
+              visited.add(candidate.key);
+              queue.push(candidate);
+            }
+          }
+        }
+
+        // Determine the best visual anchor for this cluster
+        const isMulti = clusterProvs.length > 1;
+        const avgX = clusterProvs.reduce((sum, p) => sum + p.center[0], 0) / clusterProvs.length;
+        const avgY = clusterProvs.reduce((sum, p) => sum + p.center[1], 0) / clusterProvs.length;
+
+        // Check if designated headquarters is among members
+        const hqProv = clusterProvs.find(p => p.key === faction.hqProvinceId || p.parentKey === faction.hqProvinceId);
+
+        let bestProv = clusterProvs[0];
+        let minDist = Infinity;
+        for (const p of clusterProvs) {
+          const d = Math.hypot(p.center[0] - avgX, p.center[1] - avgY);
+          if (d < minDist) {
+            minDist = d;
+            bestProv = p;
+          }
+        }
+
+        let clusterCenter: [number, number];
+        let anchorKey: string | undefined;
+
+        if (hqProv) {
+          clusterCenter = hqProv.center;
+          anchorKey = hqProv.key;
+        } else if (clusterProvs.length === 1) {
+          clusterCenter = clusterProvs[0].center;
+          anchorKey = clusterProvs[0].key;
+        } else if (minDist < 40) {
+          clusterCenter = [avgX, avgY];
+          anchorKey = bestProv.key;
+        } else {
+          clusterCenter = bestProv.center;
+          anchorKey = bestProv.key;
+        }
+
+        // Find if any member is in an alliance
+        const alliance = alliances.find(a =>
+          clusterProvs.some(p => {
+            const state = provinceStates[p.key];
+            const parentState = p.parentKey ? provinceStates[p.parentKey] : undefined;
+            const effectiveAllianceId = state?.allianceId !== undefined ? state.allianceId : parentState?.allianceId;
+            return effectiveAllianceId === a.id || a.memberProvinces.includes(p.key) || (p.parentKey ? a.memberProvinces.includes(p.parentKey) : false);
+          })
+        );
+
+        clusters.push({
+          id: `${faction.id}-unified-cluster-${clusterIdx++}`,
+          faction,
+          center: clusterCenter,
+          anchorKey,
+          memberProvs: clusterProvs,
+          isMultiProvince: isMulti,
+          alliance
+        });
+      }
+    }
+
+    return clusters;
+  }, [factions, processedProvinces, provinceStates, alliances, layerSettings.showProvinceNames, layerSettings.labelSize]);
+
+  // Set of anchor province keys where unified sect titles/emblems reside
+  const anchorProvinceKeySet = useMemo(() => {
+    return new Set(factionTerritoryClusters.map(c => c.anchorKey).filter((k): k is string => Boolean(k)));
+  }, [factionTerritoryClusters]);
+
   return (
     <div 
       ref={containerRef}
@@ -908,10 +1033,11 @@ export const MurimMapCanvas: React.FC<MurimMapCanvasProps> = ({ svgRef: external
           )}
 
           {/* ========================================================
-              LAYER 9: PROVINCE LABELS & FACTION CRESTS
+              LAYER 9: PROVINCE LABELS & UNIFIED SECT CRESTS
               ======================================================== */}
           {layerSettings.showProvinceNames && layerSettings.labelSize !== 'off' && (
             <g className="province-labels-layer pointer-events-none">
+              {/* 9A: Province & Prefecture Geographic Names */}
               {processedProvinces.map(p => {
                 // If this is a subdivision (prefecture) and user selected hideSubdivisionLabels, skip
                 if (p.isSubdivision && layerSettings.hideSubdivisionLabels) {
@@ -920,11 +1046,6 @@ export const MurimMapCanvas: React.FC<MurimMapCanvasProps> = ({ svgRef: external
 
                 const state = provinceStates[p.key];
                 const parentState = p.parentKey ? provinceStates[p.parentKey] : undefined;
-                const effectiveFactionId = state?.factionId !== undefined ? state.factionId : parentState?.factionId;
-                const effectiveAllianceId = state?.allianceId !== undefined ? state.allianceId : parentState?.allianceId;
-
-                const faction = factions.find(f => f.id === effectiveFactionId);
-                const alliance = alliances.find(a => a.id === effectiveAllianceId || a.memberProvinces.includes(p.key) || (p.parentKey ? a.memberProvinces.includes(p.parentKey) : false));
 
                 const labelSize = layerSettings.labelSize || 'small';
                 let baseFontSize = 8.5;
@@ -960,26 +1081,13 @@ export const MurimMapCanvas: React.FC<MurimMapCanvasProps> = ({ svgRef: external
                   labelText = primaryName;
                 }
 
-                const hasEmblem = layerSettings.showFactionEmblems && !!faction;
+                const isAnchor = anchorProvinceKeySet.has(p.key);
 
                 return (
-                  <g key={`label-${p.key}`} transform={`translate(${p.center[0]}, ${p.center[1]})`}>
-                    {/* Faction Shield / Crest Emblem */}
-                    {hasEmblem && (
-                      <g transform={`translate(0, ${p.isSubdivision ? -11 : -14})`}>
-                        <circle cx={0} cy={0} r={p.isSubdivision ? 6.5 : 8} fill={faction.color} stroke="#fbbf24" strokeWidth={1.2} style={{ filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.8))' }} />
-                        <foreignObject x={p.isSubdivision ? -4 : -5} y={p.isSubdivision ? -4 : -5} width={p.isSubdivision ? 8 : 10} height={p.isSubdivision ? 8 : 10}>
-                          <div className="w-full h-full text-stone-950 flex items-center justify-center font-bold">
-                            {renderFactionIcon(faction.icon, p.isSubdivision ? 'w-2 h-2 text-white' : 'w-2.5 h-2.5 text-white')}
-                          </div>
-                        </foreignObject>
-                      </g>
-                    )}
-
-                    {/* Province Name */}
+                  <g key={`prov-name-${p.key}`} transform={`translate(${p.center[0]}, ${p.center[1]})`}>
                     <text
                       x={0}
-                      y={hasEmblem ? (p.isSubdivision ? 3 : 4) : 0}
+                      y={isAnchor && layerSettings.showFactionEmblems ? -2 : 0}
                       textAnchor="middle"
                       fontSize={currentFontSize}
                       fontFamily="serif"
@@ -993,49 +1101,91 @@ export const MurimMapCanvas: React.FC<MurimMapCanvasProps> = ({ svgRef: external
                     >
                       {labelText}
                     </text>
+                  </g>
+                );
+              })}
 
-                    {/* Faction Sovereign Title Under Province */}
-                    {faction && (
-                      <text
-                        x={0}
-                        y={hasEmblem ? (p.isSubdivision ? 10.5 : 13) : (p.isSubdivision ? 7.5 : 9)}
-                        textAnchor="middle"
-                        fontSize={currentFontSize * 0.8}
-                        fontFamily="serif"
-                        fontWeight="semibold"
-                        fill={faction.color}
-                        stroke="#000000"
-                        strokeWidth={p.isSubdivision ? 1.2 : 1.5}
-                        paintOrder="stroke"
-                        className="select-none tracking-tight"
-                      >
-                        {layerSettings.nameLanguage === 'hanzi' && faction.hanzi
-                          ? faction.hanzi
-                          : (layerSettings.nameLanguage === 'both' && faction.hanzi
-                            ? `${faction.name} · ${faction.hanzi}`
-                            : faction.name)}
-                      </text>
+              {/* 9B: Unified Sect Crests & Titles (One unified shield & name per contiguous territory cluster) */}
+              {factionTerritoryClusters.map(cluster => {
+                const { faction, alliance, center, isMultiProvince } = cluster;
+                const hasEmblem = layerSettings.showFactionEmblems;
+
+                const labelSize = layerSettings.labelSize || 'small';
+                let baseFontSize = 8.5;
+                if (labelSize === 'tiny') baseFontSize = 7.0;
+                else if (labelSize === 'medium') baseFontSize = 10.5;
+                else if (labelSize === 'large') baseFontSize = 12.5;
+
+                // Multi-province cluster gets slightly more prominent title; single gets standard
+                const sectFontSize = isMultiProvince ? baseFontSize * 0.95 : baseFontSize * 0.8;
+                const emblemRadius = isMultiProvince ? 8.5 : 7.0;
+                const iconSize = isMultiProvince ? 'w-2.5 h-2.5 text-white' : 'w-2 h-2 text-white';
+
+                const titleY = hasEmblem ? 12 : 9;
+
+                return (
+                  <g key={`unified-sect-${cluster.id}`} transform={`translate(${center[0]}, ${center[1]})`}>
+                    {/* Unified Faction Shield / Crest Emblem */}
+                    {hasEmblem && (
+                      <g transform="translate(0, -15)">
+                        <circle 
+                          cx={0} 
+                          cy={0} 
+                          r={emblemRadius} 
+                          fill={faction.color} 
+                          stroke="#fbbf24" 
+                          strokeWidth={1.2} 
+                          style={{ filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.85))' }} 
+                        />
+                        <foreignObject x={-5} y={-5} width={10} height={10}>
+                          <div className="w-full h-full text-stone-950 flex items-center justify-center font-bold">
+                            {renderFactionIcon(faction.icon, iconSize)}
+                          </div>
+                        </foreignObject>
+                      </g>
                     )}
 
-                    {/* Alliance Tag if applicable */}
+                    {/* Unified Faction Sovereign Title */}
+                    <text
+                      x={0}
+                      y={titleY}
+                      textAnchor="middle"
+                      fontSize={sectFontSize}
+                      fontFamily="serif"
+                      fontWeight="bold"
+                      fill={faction.color}
+                      stroke="#000000"
+                      strokeWidth={1.8}
+                      paintOrder="stroke"
+                      className="select-none tracking-tight"
+                      style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.75))' }}
+                    >
+                      {layerSettings.nameLanguage === 'hanzi' && faction.hanzi
+                        ? faction.hanzi
+                        : (layerSettings.nameLanguage === 'both' && faction.hanzi
+                          ? `${faction.name} · ${faction.hanzi}`
+                          : faction.name)}
+                    </text>
+
+                    {/* Unified Alliance Tag */}
                     {alliance && (
-                      <g transform={`translate(0, ${hasEmblem ? (p.isSubdivision ? 17 : 22) : (p.isSubdivision ? 13.5 : 18)})`}>
+                      <g transform={`translate(0, ${hasEmblem ? 23 : 20})`}>
                         <rect 
-                          x={-((Math.max(alliance.name.length, 6) * (p.isSubdivision ? 2.6 : 3.2)) + 3)} 
-                          y={-5} 
-                          width={(Math.max(alliance.name.length, 6) * (p.isSubdivision ? 5.2 : 6.4)) + 6} 
-                          height={p.isSubdivision ? 9 : 11} 
+                          x={-((Math.max(alliance.name.length, 6) * 3.0) + 4)} 
+                          y={-5.5} 
+                          width={(Math.max(alliance.name.length, 6) * 6.0) + 8} 
+                          height={11} 
                           rx={2} 
                           fill="#181512" 
-                          fillOpacity={0.88} 
+                          fillOpacity={0.92} 
                           stroke={alliance.color} 
                           strokeWidth={0.8} 
                         />
                         <text
                           x={0}
-                          y={p.isSubdivision ? 1.5 : 2}
+                          y={2}
                           textAnchor="middle"
-                          fontSize={p.isSubdivision ? 5.5 : 6.5}
+                          fontSize={6.5}
                           fontFamily="sans-serif"
                           fontWeight="bold"
                           fill={alliance.color}
