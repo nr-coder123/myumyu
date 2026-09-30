@@ -326,10 +326,9 @@ export const Sidebar: React.FC = () => {
                         </div>
                       </div>
 
-                      {/* Color Code Input & Ledger stats */}
+                      {/* Color Code Input, Style Badge & Ledger stats */}
                       <div className="flex items-center justify-between pt-1 border-t border-stone-800/60 text-[10px]">
                         <div className="flex items-center space-x-1.5">
-                          <span className="text-stone-500">Color:</span>
                           <div 
                             className="flex items-center bg-stone-950 border border-stone-800 hover:border-amber-700/60 focus-within:border-amber-500 rounded px-1.5 py-0.5 space-x-1 transition-colors"
                             title="Edit Sect Color Code (e.g. #ff0000, #3b82f6)"
@@ -351,9 +350,27 @@ export const Sidebar: React.FC = () => {
                                   (e.target as HTMLInputElement).blur();
                                 }
                               }}
-                              className="w-16 bg-transparent font-mono text-[10px] text-amber-300 uppercase focus:outline-none"
+                              className="w-14 bg-transparent font-mono text-[10px] text-amber-300 uppercase focus:outline-none"
                             />
                           </div>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const nextStyle = faction.colorStyle === 'vivid' ? 'gradient' : faction.colorStyle === 'gradient' ? 'washed' : 'vivid';
+                              saveFaction({ ...faction, colorStyle: nextStyle });
+                            }}
+                            title="Click to toggle territory color style: Washed -> Vivid -> Gradient"
+                            className={`px-1.5 py-0.5 rounded text-[9px] font-semibold border transition-colors ${
+                              faction.colorStyle === 'vivid'
+                                ? 'bg-amber-600/30 border-amber-500 text-amber-200'
+                                : faction.colorStyle === 'gradient'
+                                ? 'bg-purple-900/40 border-purple-500 text-purple-200'
+                                : 'bg-stone-950 border-stone-800 text-stone-400 hover:text-stone-300'
+                            }`}
+                          >
+                            {faction.colorStyle === 'vivid' ? 'Vivid' : faction.colorStyle === 'gradient' ? 'Gradient' : 'Washed'}
+                          </button>
                         </div>
 
                         <div className="flex items-center space-x-2">

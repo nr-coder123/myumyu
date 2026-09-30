@@ -9,12 +9,16 @@ export type AlignmentType =
 
 export type BorderStrokeStyle = 'solid' | 'dashed' | 'dotted' | 'double' | 'glowing';
 
+export type FactionColorStyle = 'washed' | 'vivid' | 'gradient';
+
 export interface Faction {
   id: string;
   name: string;
   hanzi: string;
   color: string;
   secondaryColor?: string;
+  colorStyle?: FactionColorStyle; // 'washed' (light antique parchment, default), 'vivid' (true solid color), 'gradient' (smooth two-tone gradient)
+  gradientDirection?: 'diagonal' | 'horizontal' | 'vertical' | 'radial';
   alignment: AlignmentType;
   leader?: string;
   hqProvinceId?: string;

@@ -25,14 +25,41 @@ export const SvgDefs: React.FC<SvgDefsProps> = ({ alliances, factions = [] }) =>
       {/* Dynamic Linear & Radial Gradients for Each Custom Sect */}
       {factions.map(faction => {
         const secondary = faction.secondaryColor || darkenHexColor(faction.color, 0.4);
+        const dir = faction.gradientDirection || 'diagonal';
+
+        if (dir === 'radial') {
+          return (
+            <radialGradient
+              key={`gradient-sect-${faction.id}`}
+              id={`gradient-sect-${faction.id}`}
+              cx="50%"
+              cy="50%"
+              r="60%"
+              fx="50%"
+              fy="50%"
+            >
+              <stop offset="0%" stopColor={faction.color} stopOpacity="1" />
+              <stop offset="65%" stopColor={faction.color} stopOpacity="0.88" />
+              <stop offset="100%" stopColor={secondary} stopOpacity="0.95" />
+            </radialGradient>
+          );
+        }
+
+        let x1 = "0%", y1 = "0%", x2 = "100%", y2 = "100%";
+        if (dir === 'horizontal') {
+          x1 = "0%"; y1 = "50%"; x2 = "100%"; y2 = "50%";
+        } else if (dir === 'vertical') {
+          x1 = "50%"; y1 = "0%"; x2 = "50%"; y2 = "100%";
+        }
+
         return (
           <linearGradient
             key={`gradient-sect-${faction.id}`}
             id={`gradient-sect-${faction.id}`}
-            x1="0%"
-            y1="0%"
-            x2="100%"
-            y2="100%"
+            x1={x1}
+            y1={y1}
+            x2={x2}
+            y2={y2}
           >
             <stop offset="0%" stopColor={faction.color} stopOpacity="1" />
             <stop offset="60%" stopColor={faction.color} stopOpacity="0.85" />

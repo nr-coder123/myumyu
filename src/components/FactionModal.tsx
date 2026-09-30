@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Check, Swords, Palette, Hash, Copy } from 'lucide-react';
+import { X, Check, Swords, Palette, Hash, Copy, Droplets, Sun, Sparkles, Wand2 } from 'lucide-react';
 import { useMurim } from '../context/MurimContext';
-import { AlignmentType } from '../types/murim';
+import { AlignmentType, FactionColorStyle } from '../types/murim';
 import { FACTION_ICONS } from '../utils/factionIcons';
 import { PROVINCE_METADATA } from '../data/chinaProvinces';
 
@@ -22,6 +22,19 @@ const ALIGNMENTS: AlignmentType[] = [
   'Rogue Clan'
 ];
 
+function darkenHex(hex: string, factor = 0.4): string {
+  if (!hex || typeof hex !== 'string') return '#111827';
+  const clean = hex.replace('#', '');
+  if (clean.length !== 6 && clean.length !== 3) return '#111827';
+  const full = clean.length === 3 ? clean.split('').map(c => c + c).join('') : clean;
+  const num = parseInt(full, 16);
+  if (isNaN(num)) return '#111827';
+  const r = Math.max(0, Math.min(255, Math.floor(((num >> 16) & 255) * (1 - factor))));
+  const g = Math.max(0, Math.min(255, Math.floor(((num >> 8) & 255) * (1 - factor))));
+  const b = Math.max(0, Math.min(255, Math.floor((num & 255) * (1 - factor))));
+  return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
+}
+
 export const FactionModal: React.FC = () => {
   const { isFactionModalOpen, closeFactionModal, editingFaction, saveFaction, provinces } = useMurim();
 
@@ -29,6 +42,10 @@ export const FactionModal: React.FC = () => {
   const [hanzi, setHanzi] = useState('');
   const [color, setColor] = useState('#e11d48');
   const [colorInput, setColorInput] = useState('#e11d48');
+  const [colorStyle, setColorStyle] = useState<FactionColorStyle>('washed');
+  const [secondaryColor, setSecondaryColor] = useState('#881337');
+  const [secondaryColorInput, setSecondaryColorInput] = useState('#881337');
+  const [gradientDirection, setGradientDirection] = useState<'diagonal' | 'horizontal' | 'vertical' | 'radial'>('diagonal');
   const [alignment, setAlignment] = useState<AlignmentType>('Righteous');
   const [leader, setLeader] = useState('');
   const [hqProvinceId, setHqProvinceId] = useState('');
@@ -47,7 +64,6 @@ export const FactionModal: React.FC = () => {
       val = '#' + val;
     }
     if (/^#[0-9A-Fa-f]{3}$/.test(val)) {
-      // expand #rgb to #rrggbb
       const r = val[1];
       const g = val[2];
       const b = val[3];
@@ -63,6 +79,9 @@ export const FactionModal: React.FC = () => {
     const norm = normalizeHex(newColor);
     setColor(norm);
     setColorInput(newColor.startsWith('#') ? newColor : '#' + newColor);
+    // Automatically update suggested secondary color if currently using default/darkened version
+    setSecondaryColor(darkenHex(norm, 0.45));
+    setSecondaryColorInput(darkenHex(norm, 0.45));
   };
 
   const handleColorInputChange = (raw: string) => {
@@ -70,7 +89,10 @@ export const FactionModal: React.FC = () => {
     const cleaned = raw.trim();
     const candidate = cleaned.startsWith('#') ? cleaned : '#' + cleaned;
     if (isValidHex(candidate)) {
-      setColor(normalizeHex(candidate));
+      const norm = normalizeHex(candidate);
+      setColor(norm);
+      setSecondaryColor(darkenHex(norm, 0.45));
+      setSecondaryColorInput(darkenHex(norm, 0.45));
     }
   };
 
@@ -81,8 +103,33 @@ export const FactionModal: React.FC = () => {
       setColor(norm);
       setColorInput(norm);
     } else {
-      // Revert to current valid color
       setColorInput(color);
+    }
+  };
+
+  const handleSecondaryColorChange = (newColor: string) => {
+    const norm = normalizeHex(newColor);
+    setSecondaryColor(norm);
+    setSecondaryColorInput(newColor.startsWith('#') ? newColor : '#' + newColor);
+  };
+
+  const handleSecondaryColorInputChange = (raw: string) => {
+    setSecondaryColorInput(raw);
+    const cleaned = raw.trim();
+    const candidate = cleaned.startsWith('#') ? cleaned : '#' + cleaned;
+    if (isValidHex(candidate)) {
+      setSecondaryColor(normalizeHex(candidate));
+    }
+  };
+
+  const handleSecondaryColorInputBlur = () => {
+    const candidate = secondaryColorInput.trim().startsWith('#') ? secondaryColorInput.trim() : '#' + secondaryColorInput.trim();
+    if (isValidHex(candidate)) {
+      const norm = normalizeHex(candidate);
+      setSecondaryColor(norm);
+      setSecondaryColorInput(norm);
+    } else {
+      setSecondaryColorInput(secondaryColor);
     }
   };
 
@@ -92,6 +139,11 @@ export const FactionModal: React.FC = () => {
       setHanzi(editingFaction.hanzi || '');
       setColor(editingFaction.color);
       setColorInput(editingFaction.color);
+      setColorStyle(editingFaction.colorStyle || 'washed');
+      const sec = editingFaction.secondaryColor || darkenHex(editingFaction.color, 0.45);
+      setSecondaryColor(sec);
+      setSecondaryColorInput(sec);
+      setGradientDirection(editingFaction.gradientDirection || 'diagonal');
       setAlignment(editingFaction.alignment);
       setLeader(editingFaction.leader || '');
       setHqProvinceId(editingFaction.hqProvinceId || '');
@@ -102,6 +154,10 @@ export const FactionModal: React.FC = () => {
       setHanzi('');
       setColor('#e11d48');
       setColorInput('#e11d48');
+      setColorStyle('washed');
+      setSecondaryColor('#881337');
+      setSecondaryColorInput('#881337');
+      setGradientDirection('diagonal');
       setAlignment('Righteous');
       setLeader('');
       setHqProvinceId('');
@@ -121,6 +177,9 @@ export const FactionModal: React.FC = () => {
       name: name.trim(),
       hanzi: hanzi.trim(),
       color,
+      secondaryColor: colorStyle === 'gradient' ? secondaryColor : undefined,
+      colorStyle,
+      gradientDirection: colorStyle === 'gradient' ? gradientDirection : undefined,
       alignment,
       leader: leader.trim() || undefined,
       hqProvinceId: hqProvinceId || undefined,
@@ -260,6 +319,213 @@ export const FactionModal: React.FC = () => {
                 />
               ))}
             </div>
+          </div>
+
+          {/* Territory Color Styling & Tone (Washed / Vivid / Gradient) */}
+          <div className="p-3.5 bg-stone-900/90 rounded-xl border border-amber-900/40 space-y-3 shadow-inner">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold text-amber-200 flex items-center space-x-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                <span>Territory Color Display Mode</span>
+              </label>
+              <span className="text-[10px] text-stone-400">
+                Applied to this sect's claimed provinces
+              </span>
+            </div>
+
+            {/* 3 Color Mode Options: Washed, Vivid, Gradient */}
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => setColorStyle('washed')}
+                className={`p-2 rounded-lg border text-left transition-all flex flex-col justify-between space-y-1 ${
+                  colorStyle === 'washed'
+                    ? 'bg-amber-950/40 border-amber-500 ring-1 ring-amber-500 text-stone-100 shadow-sm'
+                    : 'bg-stone-950/60 border-stone-800 hover:border-stone-700 text-stone-400 hover:text-stone-200'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-1">
+                    <Droplets className="w-3.5 h-3.5 text-stone-400" />
+                    <span className="text-xs font-bold">Washed</span>
+                  </div>
+                  <div 
+                    className="w-3 h-3 rounded-full border border-stone-500 opacity-45"
+                    style={{ backgroundColor: color }}
+                  />
+                </div>
+                <p className="text-[10px] text-stone-400 leading-tight">
+                  Light antique parchment wash (Default)
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setColorStyle('vivid')}
+                className={`p-2 rounded-lg border text-left transition-all flex flex-col justify-between space-y-1 ${
+                  colorStyle === 'vivid'
+                    ? 'bg-amber-950/40 border-amber-500 ring-1 ring-amber-500 text-stone-100 shadow-sm'
+                    : 'bg-stone-950/60 border-stone-800 hover:border-stone-700 text-stone-400 hover:text-stone-200'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-1">
+                    <Sun className="w-3.5 h-3.5 text-amber-400" />
+                    <span className="text-xs font-bold">Vivid</span>
+                  </div>
+                  <div 
+                    className="w-3 h-3 rounded-full border border-white shadow-sm"
+                    style={{ backgroundColor: color }}
+                  />
+                </div>
+                <p className="text-[10px] text-stone-400 leading-tight">
+                  True solid actual color at full strength
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setColorStyle('gradient')}
+                className={`p-2 rounded-lg border text-left transition-all flex flex-col justify-between space-y-1 ${
+                  colorStyle === 'gradient'
+                    ? 'bg-amber-950/40 border-amber-500 ring-1 ring-amber-500 text-stone-100 shadow-sm'
+                    : 'bg-stone-950/60 border-stone-800 hover:border-stone-700 text-stone-400 hover:text-stone-200'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-1">
+                    <Wand2 className="w-3.5 h-3.5 text-amber-300" />
+                    <span className="text-xs font-bold">Gradient</span>
+                  </div>
+                  <div 
+                    className="w-3 h-3 rounded-full border border-stone-400 shadow-sm"
+                    style={{ background: `linear-gradient(135deg, ${color}, ${secondaryColor})` }}
+                  />
+                </div>
+                <p className="text-[10px] text-stone-400 leading-tight">
+                  Smooth dual-tone gradient fill
+                </p>
+              </button>
+            </div>
+
+            {/* Sub-controls when Gradient is Selected */}
+            {colorStyle === 'gradient' && (
+              <div className="p-3 bg-stone-950/90 rounded-xl border border-amber-900/30 space-y-3 animate-in fade-in duration-150">
+                {/* Secondary Color Control */}
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-stone-300">
+                    Gradient Secondary / Accent Tone:
+                  </span>
+                  
+                  <div className="flex items-center space-x-2">
+                    <div className="flex items-center bg-stone-900 border border-stone-700 rounded-lg px-2 py-0.5 space-x-1 focus-within:border-amber-500">
+                      <Hash className="w-2.5 h-2.5 text-stone-500" />
+                      <input
+                        type="text"
+                        value={secondaryColorInput}
+                        onChange={e => handleSecondaryColorInputChange(e.target.value)}
+                        onBlur={handleSecondaryColorInputBlur}
+                        placeholder="#881337"
+                        maxLength={9}
+                        className="w-18 bg-transparent text-[11px] font-mono text-amber-300 placeholder-stone-600 focus:outline-none uppercase"
+                      />
+                    </div>
+
+                    <div 
+                      className="w-6 h-6 rounded-lg border border-stone-700 relative overflow-hidden cursor-pointer shrink-0"
+                      style={{ backgroundColor: secondaryColor }}
+                      title="Choose secondary gradient spectrum"
+                    >
+                      <input
+                        type="color"
+                        value={isValidHex(secondaryColor) ? secondaryColor : '#881337'}
+                        onChange={e => handleSecondaryColorChange(e.target.value)}
+                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Secondary Presets */}
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-stone-400">Presets & Auto-generator:</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const dark = darkenHex(color, 0.45);
+                      setSecondaryColor(dark);
+                      setSecondaryColorInput(dark);
+                    }}
+                    className="text-[10px] text-amber-400 hover:text-amber-300 underline font-medium"
+                  >
+                    Auto-Match Deep Shade
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-1 p-1.5 bg-stone-900/80 rounded-lg border border-stone-800">
+                  {COLOR_PRESETS.map(c => (
+                    <button
+                      type="button"
+                      key={`sec-${c}`}
+                      onClick={() => handleSecondaryColorChange(c)}
+                      title={`Secondary: ${c}`}
+                      className={`w-4 h-4 rounded border transition-transform ${
+                        secondaryColor.toLowerCase() === c.toLowerCase() 
+                          ? 'scale-125 border-white ring-1 ring-amber-500' 
+                          : 'border-stone-700 hover:scale-110'
+                      }`}
+                      style={{ backgroundColor: c }}
+                    />
+                  ))}
+                </div>
+
+                {/* Gradient Direction */}
+                <div>
+                  <div className="text-[11px] font-semibold text-stone-300 mb-1.5">
+                    Gradient Direction & Pattern:
+                  </div>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {[
+                      { id: 'diagonal', label: 'Diagonal ↘' },
+                      { id: 'horizontal', label: 'Horizontal →' },
+                      { id: 'vertical', label: 'Vertical ↓' },
+                      { id: 'radial', label: 'Radial Glow ◎' }
+                    ].map(dir => (
+                      <button
+                        type="button"
+                        key={dir.id}
+                        onClick={() => setGradientDirection(dir.id as any)}
+                        className={`py-1 text-[10px] font-semibold rounded border transition-colors ${
+                          gradientDirection === dir.id
+                            ? 'bg-amber-600 border-amber-500 text-stone-950'
+                            : 'bg-stone-900 border-stone-800 text-stone-400 hover:text-stone-200'
+                        }`}
+                      >
+                        {dir.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Live Gradient Preview Swatch */}
+                <div className="pt-1">
+                  <div className="text-[10px] text-stone-400 mb-1">Live Gradient Swatch:</div>
+                  <div 
+                    className="h-7 w-full rounded-lg border border-stone-700/80 shadow-inner flex items-center justify-center font-bold text-[11px] text-white drop-shadow"
+                    style={{
+                      background: gradientDirection === 'radial'
+                        ? `radial-gradient(circle, ${color} 0%, ${secondaryColor} 100%)`
+                        : gradientDirection === 'horizontal'
+                        ? `linear-gradient(to right, ${color}, ${secondaryColor})`
+                        : gradientDirection === 'vertical'
+                        ? `linear-gradient(to bottom, ${color}, ${secondaryColor})`
+                        : `linear-gradient(135deg, ${color}, ${secondaryColor})`
+                    }}
+                  >
+                    {name || 'Sect Territory Fill'}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Alignment & Leader */}

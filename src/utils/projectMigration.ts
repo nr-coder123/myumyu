@@ -135,6 +135,8 @@ export function migrateProjectData(rawData: any): MurimMapProject {
     hanzi: f.hanzi || '',
     color: f.color || '#e11d48',
     secondaryColor: f.secondaryColor,
+    colorStyle: f.colorStyle || 'washed',
+    gradientDirection: f.gradientDirection || 'diagonal',
     alignment: f.alignment || 'Righteous',
     leader: f.leader || '',
     hqProvinceId: f.hqProvinceId ? normalizeProvinceKey(f.hqProvinceId) : '',

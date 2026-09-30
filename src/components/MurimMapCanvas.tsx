@@ -265,8 +265,9 @@ export const MurimMapCanvas: React.FC<MurimMapCanvasProps> = ({ svgRef: external
     const faction = factions.find(f => f.id === effectiveFactionId);
     const alliance = alliances.find(a => a.id === effectiveAllianceId || a.memberProvinces.includes(province.key) || (province.parentKey ? a.memberProvinces.includes(province.parentKey) : false));
 
-    // If sect color gradients are enabled and province has a faction
-    if (layerSettings.enableSectGradients && faction) {
+    // Per-sect or global gradient styling
+    const isSectGradient = faction && (faction.colorStyle === 'gradient' || (faction.colorStyle === undefined && layerSettings.enableSectGradients));
+    if (isSectGradient) {
       return `url(#gradient-sect-${faction.id})`;
     }
 
@@ -311,19 +312,27 @@ export const MurimMapCanvas: React.FC<MurimMapCanvasProps> = ({ svgRef: external
     return faction?.color || '#3b332a';
   }, [provinceStates, factions, alliances, mapMode, layerSettings.enableSectGradients]);
 
-  // Helper to determine province fill opacity
+  // Helper to determine province fill opacity with per-sect vivid/washed/gradient tone
   const getProvinceOpacity = useCallback((province: ProcessedProvince): number => {
     const state = provinceStates[province.key];
     const parentState = province.parentKey ? provinceStates[province.parentKey] : undefined;
     const effectiveFactionId = state?.factionId !== undefined ? state.factionId : parentState?.factionId;
     const effectiveAllianceId = state?.allianceId !== undefined ? state.allianceId : parentState?.allianceId;
 
+    const faction = factions.find(f => f.id === effectiveFactionId);
     const isClaimed = !!effectiveFactionId || !!effectiveAllianceId;
+
+    // Determine sect-specific intensity / tone
+    let isVivid = layerSettings.sectColorIntensity === 'true';
+    if (faction) {
+      if (faction.colorStyle === 'vivid') isVivid = true;
+      else if (faction.colorStyle === 'washed') isVivid = false;
+      else if (faction.colorStyle === 'gradient') isVivid = true;
+    }
 
     if (mapMode === 'parchment') {
       if (isClaimed) {
-        // True/actual color mode shows rich full-strength color, while soft mode keeps light antique wash
-        return layerSettings.sectColorIntensity === 'true' ? 0.92 : 0.45;
+        return isVivid ? 0.92 : 0.45;
       }
       return 0.85;
     }
@@ -333,8 +342,8 @@ export const MurimMapCanvas: React.FC<MurimMapCanvasProps> = ({ svgRef: external
     if (mapMode === 'borders') {
       return isClaimed ? 0.7 : 0.4;
     }
-    return isClaimed ? (layerSettings.sectColorIntensity === 'true' ? 1.0 : 0.9) : 0.6;
-  }, [provinceStates, mapMode, layerSettings.sectColorIntensity]);
+    return isClaimed ? (isVivid ? 1.0 : 0.85) : 0.6;
+  }, [provinceStates, factions, mapMode, layerSettings.sectColorIntensity]);
 
   // Filter rendered rivers and calculate dynamic label placements along river flow
   const renderedRivers = useMemo(() => {
