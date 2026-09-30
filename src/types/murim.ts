@@ -126,10 +126,14 @@ export interface LayerSettings {
   labelSize?: 'tiny' | 'small' | 'medium' | 'large' | 'off';
   nameLanguage: 'english' | 'hanzi' | 'both' | 'historical';
   hideSubdivisionLabels?: boolean;
+  showRegionNamesWhenSubdivided?: boolean;
   showAllianceBorders: boolean;
   showAllianceHatch: boolean;
+  showAllianceNames?: boolean;
   showFrontierLines: boolean;
   showFactionEmblems: boolean;
+  sectColorIntensity?: 'soft' | 'true';
+  enableSectGradients?: boolean;
   showCompass: boolean;
   showImperialSeal: boolean;
   showGraticule: boolean;

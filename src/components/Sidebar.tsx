@@ -427,6 +427,17 @@ export const Sidebar: React.FC = () => {
                   className="w-full accent-amber-500 h-1.5 bg-stone-950 rounded cursor-pointer"
                 />
               </div>
+
+              {/* Display & Banner Toggle */}
+              <div className="pt-1.5 border-t border-stone-800/60 flex items-center justify-between">
+                <span className="text-[11px] text-stone-300">Show Alliance Banners on Map:</span>
+                <input
+                  type="checkbox"
+                  checked={layerSettings.showAllianceNames !== false}
+                  onChange={e => setLayerSettings({ showAllianceNames: e.target.checked })}
+                  className="accent-amber-500"
+                />
+              </div>
             </div>
 
             {alliances.length === 0 ? (
@@ -916,6 +927,20 @@ export const Sidebar: React.FC = () => {
                 />
               </label>
 
+              {/* Show Main Region Names on Subdivisions (Option 4) */}
+              <label className="flex items-center justify-between text-stone-300 cursor-pointer pt-1 border-t border-stone-800/80">
+                <div>
+                  <span className="block font-medium">Show Main Region Names</span>
+                  <span className="text-[10px] text-stone-500 block">Display parent region title over subdivided areas</span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={!!layerSettings.showRegionNamesWhenSubdivided}
+                  onChange={e => setLayerSettings({ showRegionNamesWhenSubdivided: e.target.checked })}
+                  className="accent-amber-500"
+                />
+              </label>
+
               <div>
                 <label className="block text-[11px] text-stone-400 mb-1">Name Language Format:</label>
                 <select
@@ -940,10 +965,73 @@ export const Sidebar: React.FC = () => {
               </label>
             </div>
 
+            {/* Sect Color Intensity & Gradient Styling (Options 1 & 2) */}
+            <div className="p-3 bg-stone-900/80 rounded-lg border border-stone-800 space-y-2.5">
+              <span className="font-bold text-stone-300 block mb-1">Sect Color & Gradient Styling</span>
+              
+              {/* Option 1: True / Actual Color vs Soft Antique Wash */}
+              <div>
+                <label className="block text-[11px] text-stone-400 mb-1">Sect Color Saturation:</label>
+                <div className="grid grid-cols-2 gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setLayerSettings({ sectColorIntensity: 'soft' })}
+                    className={`py-1.5 px-2 text-[10px] font-semibold rounded border transition-colors ${
+                      (layerSettings.sectColorIntensity || 'soft') === 'soft'
+                        ? 'bg-amber-600 text-stone-950 border-amber-500 font-bold'
+                        : 'bg-stone-950 text-stone-400 border-stone-800 hover:text-stone-200'
+                    }`}
+                  >
+                    Soft Wash (Default)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLayerSettings({ sectColorIntensity: 'true' })}
+                    className={`py-1.5 px-2 text-[10px] font-semibold rounded border transition-colors ${
+                      layerSettings.sectColorIntensity === 'true'
+                        ? 'bg-amber-600 text-stone-950 border-amber-500 font-bold'
+                        : 'bg-stone-950 text-stone-400 border-stone-800 hover:text-stone-200'
+                    }`}
+                  >
+                    True Vivid Color
+                  </button>
+                </div>
+              </div>
+
+              {/* Option 2: Sect Gradients */}
+              <label className="flex items-center justify-between text-stone-300 cursor-pointer pt-1 border-t border-stone-800">
+                <div>
+                  <span className="block font-medium">Sect Color Gradients</span>
+                  <span className="text-[10px] text-stone-500 block">Apply gradient shading to sect territory fills</span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={!!layerSettings.enableSectGradients}
+                  onChange={e => setLayerSettings({ enableSectGradients: e.target.checked })}
+                  className="accent-amber-500"
+                />
+              </label>
+            </div>
+
             {/* Alliance & Border Overlays */}
             <div className="p-3 bg-stone-900/80 rounded-lg border border-stone-800 space-y-2.5">
               <span className="font-bold text-stone-300 block mb-1">Alliance & Frontier Displays</span>
+              
+              {/* Option 3: Show Alliance Banners */}
               <label className="flex items-center justify-between text-stone-300 cursor-pointer">
+                <div>
+                  <span className="block font-medium">Show Alliance Banners</span>
+                  <span className="text-[10px] text-stone-500 block">Display unified alliance banners across realms</span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={layerSettings.showAllianceNames !== false}
+                  onChange={e => setLayerSettings({ showAllianceNames: e.target.checked })}
+                  className="accent-amber-500"
+                />
+              </label>
+
+              <label className="flex items-center justify-between text-stone-300 cursor-pointer pt-1 border-t border-stone-800/80">
                 <span>Alliance Boundary Outlines</span>
                 <input
                   type="checkbox"
@@ -1083,11 +1171,32 @@ export const Sidebar: React.FC = () => {
               </div>
             </div>
 
-            {/* Status & Search */}
-            <div className="flex items-center justify-between text-xs text-stone-400">
-              <span>
-                Active Subdivisions: <strong className="text-amber-300">{subdividedRegions.length}</strong> regions
-              </span>
+            {/* Status & Display Toggles */}
+            <div className="p-2.5 bg-stone-900/60 rounded-lg border border-stone-800 space-y-2">
+              <div className="flex items-center justify-between text-xs text-stone-400">
+                <span>Active Subdivisions:</span>
+                <strong className="text-amber-300 font-mono">{subdividedRegions.length} regions</strong>
+              </div>
+              
+              <label className="flex items-center justify-between text-[11px] text-stone-300 cursor-pointer pt-1 border-t border-stone-800">
+                <span>Show Main Region Title on Map</span>
+                <input
+                  type="checkbox"
+                  checked={!!layerSettings.showRegionNamesWhenSubdivided}
+                  onChange={e => setLayerSettings({ showRegionNamesWhenSubdivided: e.target.checked })}
+                  className="accent-amber-500"
+                />
+              </label>
+
+              <label className="flex items-center justify-between text-[11px] text-stone-300 cursor-pointer">
+                <span>Hide Sub-province City Names</span>
+                <input
+                  type="checkbox"
+                  checked={!!layerSettings.hideSubdivisionLabels}
+                  onChange={e => setLayerSettings({ hideSubdivisionLabels: e.target.checked })}
+                  className="accent-amber-500"
+                />
+              </label>
             </div>
 
             <div className="relative">

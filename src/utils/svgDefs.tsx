@@ -1,13 +1,45 @@
 import React from 'react';
-import { Alliance } from '../types/murim';
+import { Alliance, Faction } from '../types/murim';
 
 interface SvgDefsProps {
   alliances: Alliance[];
+  factions?: Faction[];
 }
 
-export const SvgDefs: React.FC<SvgDefsProps> = ({ alliances }) => {
+function darkenHexColor(hex: string, factor = 0.35): string {
+  if (!hex || typeof hex !== 'string') return '#000000';
+  const clean = hex.replace('#', '');
+  if (clean.length !== 6 && clean.length !== 3) return hex;
+  const full = clean.length === 3 ? clean.split('').map(c => c + c).join('') : clean;
+  const num = parseInt(full, 16);
+  if (isNaN(num)) return hex;
+  const r = Math.max(0, Math.min(255, Math.floor(((num >> 16) & 255) * (1 - factor))));
+  const g = Math.max(0, Math.min(255, Math.floor(((num >> 8) & 255) * (1 - factor))));
+  const b = Math.max(0, Math.min(255, Math.floor((num & 255) * (1 - factor))));
+  return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
+}
+
+export const SvgDefs: React.FC<SvgDefsProps> = ({ alliances, factions = [] }) => {
   return (
     <defs>
+      {/* Dynamic Linear & Radial Gradients for Each Custom Sect */}
+      {factions.map(faction => {
+        const secondary = faction.secondaryColor || darkenHexColor(faction.color, 0.4);
+        return (
+          <linearGradient
+            key={`gradient-sect-${faction.id}`}
+            id={`gradient-sect-${faction.id}`}
+            x1="0%"
+            y1="0%"
+            x2="100%"
+            y2="100%"
+          >
+            <stop offset="0%" stopColor={faction.color} stopOpacity="1" />
+            <stop offset="60%" stopColor={faction.color} stopOpacity="0.85" />
+            <stop offset="100%" stopColor={secondary} stopOpacity="0.95" />
+          </linearGradient>
+        );
+      })}
       {/* Parchment Antique Paper Texture Filter */}
       <filter id="parchment-filter" x="0%" y="0%" width="100%" height="100%">
         <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="4" result="noise" />

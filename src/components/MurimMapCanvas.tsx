@@ -13,6 +13,7 @@ import {
 import { CHINA_RIVERS } from '../data/chinaGeography';
 import { useMurim } from '../context/MurimContext';
 import { LandmarkFeature } from '../types/murim';
+import { PROVINCE_METADATA } from '../data/chinaProvinces';
 import { SvgDefs } from '../utils/svgDefs';
 import { ProvinceTooltip } from './ProvinceTooltip';
 import { renderFactionIcon } from '../utils/factionIcons';
@@ -264,6 +265,11 @@ export const MurimMapCanvas: React.FC<MurimMapCanvasProps> = ({ svgRef: external
     const faction = factions.find(f => f.id === effectiveFactionId);
     const alliance = alliances.find(a => a.id === effectiveAllianceId || a.memberProvinces.includes(province.key) || (province.parentKey ? a.memberProvinces.includes(province.parentKey) : false));
 
+    // If sect color gradients are enabled and province has a faction
+    if (layerSettings.enableSectGradients && faction) {
+      return `url(#gradient-sect-${faction.id})`;
+    }
+
     if (mapMode === 'political') {
       if (faction) return faction.color;
       return '#3b332a'; // neutral uncolonized earth tone
@@ -277,7 +283,6 @@ export const MurimMapCanvas: React.FC<MurimMapCanvasProps> = ({ svgRef: external
 
     if (mapMode === 'parchment') {
       if (faction) {
-        // Soft antique tint of faction color
         return faction.color;
       }
       return '#dcd3ba'; // warm vintage paper wash
@@ -304,7 +309,7 @@ export const MurimMapCanvas: React.FC<MurimMapCanvasProps> = ({ svgRef: external
     }
 
     return faction?.color || '#3b332a';
-  }, [provinceStates, factions, alliances, mapMode]);
+  }, [provinceStates, factions, alliances, mapMode, layerSettings.enableSectGradients]);
 
   // Helper to determine province fill opacity
   const getProvinceOpacity = useCallback((province: ProcessedProvince): number => {
@@ -316,7 +321,11 @@ export const MurimMapCanvas: React.FC<MurimMapCanvasProps> = ({ svgRef: external
     const isClaimed = !!effectiveFactionId || !!effectiveAllianceId;
 
     if (mapMode === 'parchment') {
-      return isClaimed ? 0.45 : 0.85;
+      if (isClaimed) {
+        // True/actual color mode shows rich full-strength color, while soft mode keeps light antique wash
+        return layerSettings.sectColorIntensity === 'true' ? 0.92 : 0.45;
+      }
+      return 0.85;
     }
     if (mapMode === 'terrain') {
       return 0.75;
@@ -324,8 +333,8 @@ export const MurimMapCanvas: React.FC<MurimMapCanvasProps> = ({ svgRef: external
     if (mapMode === 'borders') {
       return isClaimed ? 0.7 : 0.4;
     }
-    return isClaimed ? 0.9 : 0.6;
-  }, [provinceStates, mapMode]);
+    return isClaimed ? (layerSettings.sectColorIntensity === 'true' ? 1.0 : 0.9) : 0.6;
+  }, [provinceStates, mapMode, layerSettings.sectColorIntensity]);
 
   // Filter rendered rivers and calculate dynamic label placements along river flow
   const renderedRivers = useMemo(() => {
@@ -531,6 +540,115 @@ export const MurimMapCanvas: React.FC<MurimMapCanvasProps> = ({ svgRef: external
     return new Set(factionTerritoryClusters.map(c => c.anchorKey).filter((k): k is string => Boolean(k)));
   }, [factionTerritoryClusters]);
 
+  // Group contiguous or adjacent territories claimed by the same alliance into unified clusters
+  // so there is only ONE alliance banner across that realm rather than repeating everywhere
+  const allianceTerritoryClusters = useMemo(() => {
+    if (!layerSettings.showProvinceNames || layerSettings.labelSize === 'off' || layerSettings.showAllianceNames === false) {
+      return [];
+    }
+
+    const clusters: {
+      id: string;
+      alliance: typeof alliances[0];
+      center: [number, number];
+      memberProvs: ProcessedProvince[];
+    }[] = [];
+
+    const ADJACENCY_DIST = 170;
+
+    for (const alliance of alliances) {
+      // Find all processed provinces in this alliance
+      const claimed = processedProvinces.filter(p => {
+        const state = provinceStates[p.key];
+        const parentState = p.parentKey ? provinceStates[p.parentKey] : undefined;
+        const effectiveAllianceId = state?.allianceId !== undefined ? state.allianceId : parentState?.allianceId;
+        return effectiveAllianceId === alliance.id || alliance.memberProvinces.includes(p.key) || (p.parentKey ? alliance.memberProvinces.includes(p.parentKey) : false);
+      });
+
+      if (claimed.length === 0) continue;
+
+      const visited = new Set<string>();
+      let clusterIdx = 0;
+
+      for (const prov of claimed) {
+        if (visited.has(prov.key)) continue;
+
+        const clusterProvs: ProcessedProvince[] = [];
+        const queue: ProcessedProvince[] = [prov];
+        visited.add(prov.key);
+
+        while (queue.length > 0) {
+          const curr = queue.shift()!;
+          clusterProvs.push(curr);
+
+          for (const candidate of claimed) {
+            if (visited.has(candidate.key)) continue;
+
+            const isSameParent = !!(curr.parentKey && candidate.parentKey && curr.parentKey === candidate.parentKey);
+            const isParentChild = curr.parentKey === candidate.key || candidate.parentKey === curr.key;
+            const dist = Math.hypot(curr.center[0] - candidate.center[0], curr.center[1] - candidate.center[1]);
+            const isAdjacent = dist <= ADJACENCY_DIST;
+
+            if (isSameParent || isParentChild || isAdjacent) {
+              visited.add(candidate.key);
+              queue.push(candidate);
+            }
+          }
+        }
+
+        const avgX = clusterProvs.reduce((sum, p) => sum + p.center[0], 0) / clusterProvs.length;
+        const avgY = clusterProvs.reduce((sum, p) => sum + p.center[1], 0) / clusterProvs.length;
+
+        clusters.push({
+          id: `${alliance.id}-unified-alliance-${clusterIdx++}`,
+          alliance,
+          center: [avgX, avgY],
+          memberProvs: clusterProvs
+        });
+      }
+    }
+
+    return clusters;
+  }, [alliances, processedProvinces, provinceStates, layerSettings.showProvinceNames, layerSettings.labelSize, layerSettings.showAllianceNames]);
+
+  // Compute top-level parent province titles for subdivided regions (Option 4)
+  const subdividedParentRegionTitles = useMemo(() => {
+    if (!layerSettings.showRegionNamesWhenSubdivided) {
+      return [];
+    }
+
+    return subdividedRegions.map(parentKey => {
+      const subs = processedProvinces.filter(p => p.parentKey === parentKey);
+      if (subs.length === 0) return null;
+
+      const avgX = subs.reduce((sum, p) => sum + p.center[0], 0) / subs.length;
+      const avgY = subs.reduce((sum, p) => sum + p.center[1], 0) / subs.length;
+
+      const parentState = provinceStates[parentKey];
+      const meta = PROVINCE_METADATA[parentKey] || { name: parentKey, hanzi: parentKey, historicalName: parentKey };
+
+      const customName = parentState?.customDisplayName?.trim();
+      const primaryName = customName || meta.name;
+
+      let labelText = primaryName;
+      if (layerSettings.nameLanguage === 'hanzi') {
+        labelText = customName || parentKey;
+      } else if (layerSettings.nameLanguage === 'both') {
+        labelText = `${primaryName} · ${parentKey}`;
+      } else if (layerSettings.nameLanguage === 'historical') {
+        labelText = customName || (meta as any).historicalName || meta.name;
+      } else {
+        labelText = primaryName;
+      }
+
+      return {
+        parentKey,
+        center: [avgX, avgY] as [number, number],
+        labelText
+      };
+    }).filter((item): item is { parentKey: string; center: [number, number]; labelText: string } => item !== null);
+  }, [subdividedRegions, processedProvinces, provinceStates, layerSettings.showRegionNamesWhenSubdivided, layerSettings.nameLanguage]);
+
   return (
     <div 
       ref={containerRef}
@@ -556,7 +674,7 @@ export const MurimMapCanvas: React.FC<MurimMapCanvasProps> = ({ svgRef: external
         }}
       >
         {/* Defs: Patterns, Filters & Gradients */}
-        <SvgDefs alliances={alliances} />
+        <SvgDefs alliances={alliances} factions={factions} />
 
         {/* Scaled & Translated World Container */}
         <g 
@@ -1107,7 +1225,7 @@ export const MurimMapCanvas: React.FC<MurimMapCanvasProps> = ({ svgRef: external
 
               {/* 9B: Unified Sect Crests & Titles (One unified shield & name per contiguous territory cluster) */}
               {factionTerritoryClusters.map(cluster => {
-                const { faction, alliance, center, isMultiProvince } = cluster;
+                const { faction, center, isMultiProvince } = cluster;
                 const hasEmblem = layerSettings.showFactionEmblems;
 
                 const labelSize = layerSettings.labelSize || 'small';
@@ -1166,36 +1284,67 @@ export const MurimMapCanvas: React.FC<MurimMapCanvasProps> = ({ svgRef: external
                           ? `${faction.name} · ${faction.hanzi}`
                           : faction.name)}
                     </text>
+                  </g>
+                );
+              })}
 
-                    {/* Unified Alliance Tag */}
-                    {alliance && (
-                      <g transform={`translate(0, ${hasEmblem ? 23 : 20})`}>
-                        <rect 
-                          x={-((Math.max(alliance.name.length, 6) * 3.0) + 4)} 
-                          y={-5.5} 
-                          width={(Math.max(alliance.name.length, 6) * 6.0) + 8} 
-                          height={11} 
-                          rx={2} 
-                          fill="#181512" 
-                          fillOpacity={0.92} 
-                          stroke={alliance.color} 
-                          strokeWidth={0.8} 
-                        />
-                        <text
-                          x={0}
-                          y={2}
-                          textAnchor="middle"
-                          fontSize={6.5}
-                          fontFamily="sans-serif"
-                          fontWeight="bold"
-                          fill={alliance.color}
-                        >
-                          {layerSettings.nameLanguage === 'hanzi' && alliance.hanzi
-                            ? alliance.hanzi
-                            : alliance.name}
-                        </text>
-                      </g>
-                    )}
+              {/* 9C: Top-Level Region (Parent Province) Titles on Subdivided Areas (Option 4) */}
+              {subdividedParentRegionTitles.map(region => (
+                <g key={`subdivided-parent-title-${region.parentKey}`} transform={`translate(${region.center[0]}, ${region.center[1] - 22})`} className="pointer-events-none">
+                  <text
+                    x={0}
+                    y={0}
+                    textAnchor="middle"
+                    fontSize={12.5}
+                    fontFamily="serif"
+                    fontWeight="900"
+                    letterSpacing="2px"
+                    fill={mapMode === 'parchment' ? '#5a2d0c' : '#fde68a'}
+                    stroke={mapMode === 'parchment' ? '#fdf6e2' : '#000000'}
+                    strokeWidth={2.5}
+                    paintOrder="stroke"
+                    opacity={0.88}
+                    className="select-none uppercase"
+                    style={{ filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.65))' }}
+                  >
+                    {region.labelText}
+                  </text>
+                </g>
+              ))}
+
+              {/* 9D: Unified Alliance Sovereign Banners (Option 3: Toggleable & Unified per contiguous domain) */}
+              {layerSettings.showAllianceNames !== false && allianceTerritoryClusters.map(cluster => {
+                const { alliance, center } = cluster;
+                const labelText = layerSettings.nameLanguage === 'hanzi' && alliance.hanzi
+                  ? alliance.hanzi
+                  : (layerSettings.nameLanguage === 'both' && alliance.hanzi ? `${alliance.name} · ${alliance.hanzi}` : alliance.name);
+
+                return (
+                  <g key={`unified-alliance-banner-${cluster.id}`} transform={`translate(${center[0]}, ${center[1] + 20})`} className="pointer-events-none">
+                    <rect 
+                      x={-((Math.max(labelText.length, 6) * 3.4) + 6)} 
+                      y={-6.5} 
+                      width={(Math.max(labelText.length, 6) * 6.8) + 12} 
+                      height={13} 
+                      rx={3} 
+                      fill="#120f0c" 
+                      fillOpacity={0.94} 
+                      stroke={alliance.color} 
+                      strokeWidth={1.2} 
+                      style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.85))' }}
+                    />
+                    <text
+                      x={0}
+                      y={3}
+                      textAnchor="middle"
+                      fontSize={7.5}
+                      fontFamily="sans-serif"
+                      fontWeight="black"
+                      fill={alliance.color}
+                      letterSpacing="0.4px"
+                    >
+                      {labelText}
+                    </text>
                   </g>
                 );
               })}
