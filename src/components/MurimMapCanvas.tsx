@@ -257,8 +257,12 @@ export const MurimMapCanvas: React.FC<MurimMapCanvasProps> = ({ svgRef: external
   // Helper to determine province fill color based on MapMode
   const getProvinceFill = useCallback((province: ProcessedProvince): string => {
     const state = provinceStates[province.key];
-    const faction = factions.find(f => f.id === state?.factionId);
-    const alliance = alliances.find(a => a.id === state?.allianceId || a.memberProvinces.includes(province.key));
+    const parentState = province.parentKey ? provinceStates[province.parentKey] : undefined;
+    const effectiveFactionId = state?.factionId !== undefined ? state.factionId : parentState?.factionId;
+    const effectiveAllianceId = state?.allianceId !== undefined ? state.allianceId : parentState?.allianceId;
+
+    const faction = factions.find(f => f.id === effectiveFactionId);
+    const alliance = alliances.find(a => a.id === effectiveAllianceId || a.memberProvinces.includes(province.key) || (province.parentKey ? a.memberProvinces.includes(province.parentKey) : false));
 
     if (mapMode === 'political') {
       if (faction) return faction.color;
@@ -305,7 +309,11 @@ export const MurimMapCanvas: React.FC<MurimMapCanvasProps> = ({ svgRef: external
   // Helper to determine province fill opacity
   const getProvinceOpacity = useCallback((province: ProcessedProvince): number => {
     const state = provinceStates[province.key];
-    const isClaimed = !!state?.factionId || !!state?.allianceId;
+    const parentState = province.parentKey ? provinceStates[province.parentKey] : undefined;
+    const effectiveFactionId = state?.factionId !== undefined ? state.factionId : parentState?.factionId;
+    const effectiveAllianceId = state?.allianceId !== undefined ? state.allianceId : parentState?.allianceId;
+
+    const isClaimed = !!effectiveFactionId || !!effectiveAllianceId;
 
     if (mapMode === 'parchment') {
       return isClaimed ? 0.45 : 0.85;
@@ -911,8 +919,12 @@ export const MurimMapCanvas: React.FC<MurimMapCanvasProps> = ({ svgRef: external
                 }
 
                 const state = provinceStates[p.key];
-                const faction = factions.find(f => f.id === state?.factionId);
-                const alliance = alliances.find(a => a.id === state?.allianceId || a.memberProvinces.includes(p.key));
+                const parentState = p.parentKey ? provinceStates[p.parentKey] : undefined;
+                const effectiveFactionId = state?.factionId !== undefined ? state.factionId : parentState?.factionId;
+                const effectiveAllianceId = state?.allianceId !== undefined ? state.allianceId : parentState?.allianceId;
+
+                const faction = factions.find(f => f.id === effectiveFactionId);
+                const alliance = alliances.find(a => a.id === effectiveAllianceId || a.memberProvinces.includes(p.key) || (p.parentKey ? a.memberProvinces.includes(p.parentKey) : false));
 
                 const labelSize = layerSettings.labelSize || 'small';
                 let baseFontSize = 8.5;
@@ -932,7 +944,7 @@ export const MurimMapCanvas: React.FC<MurimMapCanvasProps> = ({ svgRef: external
                 const currentFontSize = p.isSubdivision ? baseFontSize * 0.8 : baseFontSize;
                 const currentStroke = p.isSubdivision ? baseStroke * 0.8 : baseStroke;
 
-                const customName = state?.customDisplayName?.trim();
+                const customName = (state?.customDisplayName || parentState?.customDisplayName)?.trim();
                 const primaryName = customName || p.meta.name;
 
                 let labelText = primaryName;
@@ -954,11 +966,11 @@ export const MurimMapCanvas: React.FC<MurimMapCanvasProps> = ({ svgRef: external
                   <g key={`label-${p.key}`} transform={`translate(${p.center[0]}, ${p.center[1]})`}>
                     {/* Faction Shield / Crest Emblem */}
                     {hasEmblem && (
-                      <g transform="translate(0, -14)">
-                        <circle cx={0} cy={0} r={8} fill={faction.color} stroke="#fbbf24" strokeWidth={1.2} style={{ filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.8))' }} />
-                        <foreignObject x={-5} y={-5} width={10} height={10}>
+                      <g transform={`translate(0, ${p.isSubdivision ? -11 : -14})`}>
+                        <circle cx={0} cy={0} r={p.isSubdivision ? 6.5 : 8} fill={faction.color} stroke="#fbbf24" strokeWidth={1.2} style={{ filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.8))' }} />
+                        <foreignObject x={p.isSubdivision ? -4 : -5} y={p.isSubdivision ? -4 : -5} width={p.isSubdivision ? 8 : 10} height={p.isSubdivision ? 8 : 10}>
                           <div className="w-full h-full text-stone-950 flex items-center justify-center font-bold">
-                            {renderFactionIcon(faction.icon, 'w-2.5 h-2.5 text-white')}
+                            {renderFactionIcon(faction.icon, p.isSubdivision ? 'w-2 h-2 text-white' : 'w-2.5 h-2.5 text-white')}
                           </div>
                         </foreignObject>
                       </g>
@@ -967,7 +979,7 @@ export const MurimMapCanvas: React.FC<MurimMapCanvasProps> = ({ svgRef: external
                     {/* Province Name */}
                     <text
                       x={0}
-                      y={hasEmblem ? 4 : 0}
+                      y={hasEmblem ? (p.isSubdivision ? 3 : 4) : 0}
                       textAnchor="middle"
                       fontSize={currentFontSize}
                       fontFamily="serif"
@@ -983,17 +995,17 @@ export const MurimMapCanvas: React.FC<MurimMapCanvasProps> = ({ svgRef: external
                     </text>
 
                     {/* Faction Sovereign Title Under Province */}
-                    {faction && !p.isSubdivision && (
+                    {faction && (
                       <text
                         x={0}
-                        y={hasEmblem ? 13 : 9}
+                        y={hasEmblem ? (p.isSubdivision ? 10.5 : 13) : (p.isSubdivision ? 7.5 : 9)}
                         textAnchor="middle"
                         fontSize={currentFontSize * 0.8}
                         fontFamily="serif"
                         fontWeight="semibold"
                         fill={faction.color}
                         stroke="#000000"
-                        strokeWidth={1.5}
+                        strokeWidth={p.isSubdivision ? 1.2 : 1.5}
                         paintOrder="stroke"
                         className="select-none tracking-tight"
                       >
@@ -1005,14 +1017,14 @@ export const MurimMapCanvas: React.FC<MurimMapCanvasProps> = ({ svgRef: external
                       </text>
                     )}
 
-                    {/* Alliance Tag if applicable (only shown on primary province to reduce clutter) */}
-                    {alliance && !p.isSubdivision && (
-                      <g transform={`translate(0, ${hasEmblem ? 22 : 18})`}>
+                    {/* Alliance Tag if applicable */}
+                    {alliance && (
+                      <g transform={`translate(0, ${hasEmblem ? (p.isSubdivision ? 17 : 22) : (p.isSubdivision ? 13.5 : 18)})`}>
                         <rect 
-                          x={-((Math.max(alliance.name.length, 6) * 3.2) + 4)} 
-                          y={-6} 
-                          width={(Math.max(alliance.name.length, 6) * 6.4) + 8} 
-                          height={11} 
+                          x={-((Math.max(alliance.name.length, 6) * (p.isSubdivision ? 2.6 : 3.2)) + 3)} 
+                          y={-5} 
+                          width={(Math.max(alliance.name.length, 6) * (p.isSubdivision ? 5.2 : 6.4)) + 6} 
+                          height={p.isSubdivision ? 9 : 11} 
                           rx={2} 
                           fill="#181512" 
                           fillOpacity={0.88} 
@@ -1021,9 +1033,9 @@ export const MurimMapCanvas: React.FC<MurimMapCanvasProps> = ({ svgRef: external
                         />
                         <text
                           x={0}
-                          y={2}
+                          y={p.isSubdivision ? 1.5 : 2}
                           textAnchor="middle"
-                          fontSize={6.5}
+                          fontSize={p.isSubdivision ? 5.5 : 6.5}
                           fontFamily="sans-serif"
                           fontWeight="bold"
                           fill={alliance.color}

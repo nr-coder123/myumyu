@@ -15,10 +15,14 @@ export const ProvinceTooltip: React.FC<ProvinceTooltipProps> = ({ province, posi
 
   if (!province || !position) return null;
 
-  const state = provinces[province.key] || {};
-  const faction = factions.find(f => f.id === state.factionId);
-  const alliance = alliances.find(a => a.id === state.allianceId || a.memberProvinces.includes(province.key));
-  const hasCustomBorder = !!state.customBorder?.enabled;
+  const state = provinces[province.key];
+  const parentState = province.parentKey ? provinces[province.parentKey] : undefined;
+  const effectiveFactionId = state?.factionId !== undefined ? state.factionId : parentState?.factionId;
+  const effectiveAllianceId = state?.allianceId !== undefined ? state.allianceId : parentState?.allianceId;
+
+  const faction = factions.find(f => f.id === effectiveFactionId);
+  const alliance = alliances.find(a => a.id === effectiveAllianceId || a.memberProvinces.includes(province.key) || (province.parentKey ? a.memberProvinces.includes(province.parentKey) : false));
+  const hasCustomBorder = !!(state?.customBorder?.enabled || parentState?.customBorder?.enabled);
 
   // Find rivers that pass nearby/through this province
   const associatedRivers = CHINA_RIVERS.filter(r => {
@@ -48,7 +52,7 @@ export const ProvinceTooltip: React.FC<ProvinceTooltipProps> = ({ province, posi
                 {province.key}
               </span>
               <span className="text-stone-300 text-sm font-semibold">
-                {state.customDisplayName || province.meta.name}
+                {state?.customDisplayName || parentState?.customDisplayName || province.meta.name}
               </span>
             </div>
             <p className="text-[10px] text-amber-500/90 font-serif italic">
